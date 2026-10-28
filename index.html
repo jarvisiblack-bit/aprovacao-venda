@@ -64,6 +64,14 @@
   .tabs{max-width:980px;margin:0 auto;padding:4px 16px 8px;display:flex;gap:6px;flex-wrap:wrap}
   .tabs button{background:var(--card2);border:1px solid var(--line);color:var(--mut);padding:10px 14px;border-radius:999px;font:inherit;font-weight:600;cursor:pointer}
   .tabs button.on{background:#fff;color:#000;border-color:#fff}
+  .pick{width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .pick.vazio{color:var(--mut)}
+  .lista{margin-top:6px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:420px;overflow-y:auto}
+  .lista h4{margin:10px 2px 6px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--mut)}
+  .lista h4:first-child{margin-top:2px}
+  .lista .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+  .lista .opts button{background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
+  .lista .opts button.on{background:#fff;color:#000;border-color:#fff}
 </style>
 </head>
 <body>
@@ -348,6 +356,21 @@ function setTroca(v){troca=v;$('trocaS').classList.toggle('on',v);$('trocaN').cl
 /* ---------- aba: venda de seminovo ---------- */
 let sPag='avista', sBat=false;
 const r9=v=>Math.ceil((v+1)/10)*10-1;            // arredonda para cima terminando em 9 (5.509, 6.269...)
+function picker(id){
+  const sel=$(id); sel.classList.add('hide');
+  let btn=$(id+'Btn'), box=$(id+'Box');
+  if(!btn){btn=document.createElement('button');btn.type='button';btn.id=id+'Btn';btn.className='pick';sel.after(btn);
+           box=document.createElement('div');box.id=id+'Box';box.className='lista hide';btn.after(box)}
+  const g={},cap=['128GB','256GB','512GB','1TB'];USADOS.forEach((u,i)=>{(g[u.s]=g[u.s]||[]).push([i,u.m+' '+u.c,u.m,cap.indexOf(u.c)])});
+  Object.values(g).forEach(o=>o.sort((x,y)=>x[2].localeCompare(y[2],'pt')||x[3]-y[3]));
+  const draw=()=>{const v=sel.value,u=USADOS[v];
+    btn.className='pick'+(u?'':' vazio');btn.innerHTML=`<span>${u?u.m+' '+u.c:'Toque aqui e escolha o modelo'}</span><span>${box.classList.contains('hide')?'▼':'▲'}</span>`;
+    box.innerHTML=Object.entries(g).map(([k,o])=>`<h4>${k}</h4><div class="opts">${o.map(([i,t])=>`<button type="button" data-i="${i}" class="${String(i)===v?'on':''}">${t}</button>`).join('')}</div>`).join('')+
+      `<h4>Outro</h4><div class="opts"><button type="button" data-i="" class="${v===''?'on':''}">Modelo fora da lista</button></div>`;
+    box.querySelectorAll('button').forEach(b=>b.onclick=()=>{sel.value=b.dataset.i;box.classList.add('hide');draw();sel.dispatchEvent(new Event('change'))});};
+  btn.onclick=()=>{box.classList.toggle('hide');draw()};
+  draw(); sel._draw=draw;
+}
 function aba(x){['A','B'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
 function sSeg(){
   const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
@@ -401,7 +424,7 @@ function initSemi(){
   $('sModelo').innerHTML='<option value="">▼ Toque aqui e escolha o modelo</option>'+Object.entries(g).map(([k,o])=>`<optgroup label="${k}">${o.join('')}</optgroup>`).join('');
   $('sModelo').onchange=sCalc; $('sCusto').addEventListener('input',sCalc); $('sPreco').addEventListener('input',sCalc);
   $('sBatN').onclick=()=>sSetBat(false); $('sBatS').onclick=()=>sSetBat(true);
-  sSeg(); sCalc();
+  sSeg(); sCalc(); picker('sModelo'); picker('modeloU');
   try{if(localStorage.getItem('ib_aba')==='B')aba('B')}catch(e){}
 }
 
