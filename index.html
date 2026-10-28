@@ -61,6 +61,9 @@
   .lock form{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;width:100%;max-width:340px}
   .lock h3{margin:0 0 6px;letter-spacing:.14em} .lock p{color:var(--mut);font-size:13.5px;margin:0 0 14px}
   .lock .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+  .tabs{max-width:980px;margin:0 auto;padding:4px 16px 8px;display:flex;gap:6px;flex-wrap:wrap}
+  .tabs button{background:var(--card2);border:1px solid var(--line);color:var(--mut);padding:10px 14px;border-radius:999px;font:inherit;font-weight:600;cursor:pointer}
+  .tabs button.on{background:#fff;color:#000;border-color:#fff}
 </style>
 </head>
 <body>
@@ -78,7 +81,8 @@ const CONFIG = {
   taxaRevendaUsado: 0,                       // seminovo: parcelado é repassado ao cliente (12x = à vista + 12%)
   selic: 15,                                 // % ao ano — custo do usado parado
   desvalorizacaoUsado: 0,                    // % ao mês (opcional)
-  diasPadraoUsado: 30,                       // prazo médio para vender o usado
+  diasPadraoUsado: 30,
+  diasAlertaParado: 60,                      // acima disso, alerta de aparelho parado na venda de seminovo                       // prazo médio para vender o usado
 };
 let USADOS = [];   // carregado de dados.json (criptografado)
 let EXEMPLO = [];
@@ -88,9 +92,10 @@ let EXEMPLO = [];
   <div class="brand">IBLACK<small>Aprovação de venda e desconto</small></div>
   <div style="display:flex;align-items:center;gap:10px"><span id="quem" style="color:var(--mut);font-size:13px"></span><button class="btn ghost hide" id="btnSair" onclick="sair()">Sair</button></div>
 </header>
+<nav class="tabs"><button id="tabA" class="on" onclick="aba('A')">Venda de novo · troca</button><button id="tabB" onclick="aba('B')">Venda de seminovo</button></nav>
 <div class="banner hide" id="banner"><div id="bannerTxt"></div></div>
 
-<main>
+<main id="abaA">
   <section class="card">
     <h2>Proposta</h2>
     <div class="field">
@@ -127,6 +132,30 @@ let EXEMPLO = [];
   <section class="card full hide" id="dir">
     <h2>Diretoria · detalhe da operação</h2>
     <div style="overflow-x:auto"><table id="det"></table></div>
+  </section>
+</main>
+
+<main id="abaB" class="hide">
+  <section class="card">
+    <h2>Seminovo em estoque</h2>
+    <div class="field"><label>Modelo</label><select id="sModelo"></select><div class="hint" id="sRef"></div></div>
+    <div class="row">
+      <div class="field"><label>Custo de entrada (R$)</label><input type="number" step="0.01" id="sCusto" inputmode="decimal"><div class="hint">Quanto o aparelho custou para a loja.</div></div>
+      <div class="field"><label>Dias em estoque até vender</label><input type="number" step="1" min="0" id="sDias" inputmode="numeric"><div class="hint">Desde a entrada até a venda.</div></div>
+    </div>
+    <div class="field"><label>Troca de bateria? Custo (R$)</label><input type="number" step="0.01" id="sBat" inputmode="decimal" placeholder="0 = não vai trocar"></div>
+    <label>Pagamento</label>
+    <div class="seg" id="sSeg"></div>
+    <div class="field"><label>Valor que o cliente quer pagar (R$)</label><input type="number" step="0.01" id="sPreco" inputmode="decimal"><div class="hint">Opcional — já vem com o preço sugerido.</div></div>
+  </section>
+  <section class="card">
+    <h2>Resposta</h2>
+    <div class="status" id="sStatus"><div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo de entrada</div></div>
+    <div class="faixas" id="sFaixas"></div>
+  </section>
+  <section class="card full hide" id="sDir">
+    <h2>Diretoria · detalhe da venda</h2>
+    <div style="overflow-x:auto"><table id="sDet"></table></div>
   </section>
 </main>
 <p class="foot" id="foot"></p>
@@ -307,6 +336,68 @@ function seg(){
 function precoOficial(){const it=lista[$('aparelho').value];$('preco').value=it&&it[2][pag]?it[2][pag]:''}
 function setTroca(v){troca=v;$('trocaS').classList.toggle('on',v);$('trocaN').classList.toggle('on',!v);calc()}
 
+
+/* ---------- aba: venda de seminovo ---------- */
+let sPag='avista';
+function aba(x){['A','B'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
+function sSeg(){
+  const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
+  $('sSeg').innerHTML=o.map(([v,t])=>`<button data-v="${v}" class="${v===sPag?'on':''}">${t}</button>`).join('');
+  $('sSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{const ant=sPag;sPag=b.dataset.v;sSeg();
+    const r=sCalcBase(); if(r && (!num('sPreco') || Math.abs(num('sPreco')-r.sug[ant])<1)) $('sPreco').value=Math.round(r.sug[sPag]);
+    sCalc()});
+}
+function sCalcBase(){
+  const T=num('sCusto'); if(!T) return null;
+  const c=CONFIG.comissao/100,m=CONFIG.margemMinima/100,dias=num('sDias'),bat=num('sBat'),cabo=CONFIG.custoCaboUsado;
+  const parado=T*(CONFIG.selic/100)*dias/365, custoTot=T+parado+cabo+bat;
+  const um=USADOS[$('sModelo').value], ref=um&&um.rev?um.rev+(bat?0:0):0;
+  const min={},sug={};
+  for(const p of ['avista','x12','x18']){const f=taxa(p); min[p]=custoTot/(1-c-f-m)}
+  const base=Math.max(ref,min.avista);
+  for(const p of ['avista','x12','x18']){const f=taxa(p); sug[p]=Math.max(base/(1-f),min[p])}
+  return {T,dias,bat,cabo,parado,custoTot,min,sug,ref,um,c,m};
+}
+function sCalc(){
+  const r=sCalcBase(), fx=(k,t,v,s)=>`<div class="fx ${k}"><span>${t}<small>${s}</small></span><b>${v}</b></div>`;
+  const um=USADOS[$('sModelo').value];
+  $('sRef').innerHTML=um?`Referência de mercado à vista: <b>${brl(um.rev)}</b> · teto de compra ${brl(um.teto)}`:'Sem referência de mercado — o preço sugerido será o mínimo com 15%.';
+  if(!r){$('sStatus').className='status';$('sStatus').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo de entrada</div>';$('sFaixas').innerHTML='';$('sDet').innerHTML='';return}
+  const P=num('sPreco'), f=taxa(sPag), lucro=P-P*f-P*r.c-r.custoTot, marg=P?lucro/P*100:0, min=r.min[sPag];
+  const nomePag=sPag==='avista'?'à vista':sPag.slice(1)+'x', parc=sPag==='avista'?1:parseInt(sPag.slice(1));
+  let cls,lbl,big,sub;
+  if(!P){cls='';lbl='Preços calculados';big=brl(r.sug[sPag]);sub=`Preço sugerido ${nomePag}. Mínimo: ${brl(min)}.`}
+  else if(P>=min-0.5){cls='s-ok';lbl='Pode vender';big='Venda aprovada';sub=`${brl(P)} ${nomePag} mantém ${pct(marg)} de lucro.`}
+  else{cls='s-bad';lbl='Não pode vender por esse valor';big='Abaixo da margem mínima';sub=`O menor valor ${nomePag} é <b>${brl(min)}</b>. Por ${brl(P)} a margem fica em ${pct(marg)}${lucro<0?' (prejuízo)':''}.`}
+  if(r.dias>CONFIG.diasAlertaParado) sub+=` ⚠️ Aparelho parado há ${r.dias} dias — o custo já subiu ${brl(r.parado)}; priorize o giro.`;
+  $('sStatus').className='status '+cls;
+  $('sStatus').innerHTML=`<div class="lbl">${lbl}</div><div class="big">${big}</div><div class="sub">${sub}</div>`;
+  const L=(p,t)=>{const n=p==='avista'?1:parseInt(p.slice(1));return fx(p===sPag?'ok':'',t,brl(r.sug[p]),`mínimo ${brl(r.min[p])}${n>1?' · '+n+'x de '+brl(r.sug[p]/n):''}`)};
+  let h=L('avista','Preço sugerido à vista')+L('x12','Preço sugerido 12x')+L('x18','Preço sugerido 18x');
+  const dmax=r.sug[sPag]-min;
+  h+=fx(dmax>0.5?'ok':'warn','Desconto máximo '+nomePag, brl(Math.max(dmax,0)), dmax>0.5?`do sugerido até o mínimo de ${r.m*100}% de lucro`:'sem espaço para desconto — vender pelo mínimo');
+  h+=`<div class="hint">Regra: lucro mínimo de ${r.m*100}% já descontando comissão ${CONFIG.comissao}%, cabo de brinde (${brl(r.cabo)}), dinheiro parado ${r.dias} dias (Selic ${CONFIG.selic}% a.a.)${r.bat?', troca de bateria ('+brl(r.bat)+')':''} e taxa da maquininha no parcelado.</div>`;
+  $('sFaixas').innerHTML=h;
+  if(diretoria){
+    const T=(a,b,k)=>`<tr><td>${a}</td><td class="${k||''}">${b}</td></tr>`;
+    $('sDir').classList.remove('hide');
+    $('sDet').innerHTML=`<tr class="sec"><td colspan="2">Venda ${nomePag}</td></tr>`+T('Preço',brl(P||r.sug[sPag]))+
+      T('Custo de entrada',brl(-r.T),'neg')+T(`Dinheiro parado ${r.dias} dias`,brl(-r.parado),'neg')+T('Cabo IBLACK de brinde',brl(-r.cabo),'neg')+
+      (r.bat?T('Troca de bateria',brl(-r.bat),'neg'):'')+T(`Comissão ${CONFIG.comissao}%`,brl(-(P||r.sug[sPag])*r.c),'neg')+
+      (f?T(`Taxa ${nomePag}`,brl(-(P||r.sug[sPag])*f),'neg'):'')+
+      (()=>{const PP=P||r.sug[sPag],l=PP-PP*f-PP*r.c-r.custoTot;return `<tr class="tot"><td>Lucro · ${pct(PP?l/PP*100:0)}</td><td class="${l<0?'neg':'pos'}">${brl(l)}</td></tr>`})();
+  }
+}
+function initSemi(){
+  const g={};USADOS.forEach((u,i)=>{(g[u.s]=g[u.s]||[]).push(`<option value="${i}">${u.m} ${u.c}</option>`)});
+  $('sModelo').innerHTML='<option value="">Outro modelo (sem referência)</option>'+Object.entries(g).map(([k,o])=>`<optgroup label="${k}">${o.join('')}</optgroup>`).join('');
+  const sugerir=()=>{const r=sCalcBase();$('sPreco').value=r?Math.round(r.sug[sPag]):'';sCalc()};
+  $('sModelo').onchange=sugerir; $('sCusto').addEventListener('input',sugerir); $('sBat').addEventListener('input',sugerir);
+  $('sDias').addEventListener('input',sugerir); $('sPreco').addEventListener('input',sCalc);
+  $('sDias').value=CONFIG.diasPadraoUsado; sSeg(); sCalc();
+  try{if(localStorage.getItem('ib_aba')==='B')aba('B')}catch(e){}
+}
+
 (async()=>{
   await carregar();
   const grupos={};lista.forEach((x,i)=>{(grupos[x[3]||'Produtos']=grupos[x[3]||'Produtos']||[]).push(`<option value="${i}">${x[0]}${x[1]?'':' · sob encomenda'}</option>`)});
@@ -316,7 +407,7 @@ function setTroca(v){troca=v;$('trocaS').classList.toggle('on',v);$('trocaN').cl
   $('dias').value=CONFIG.diasPadraoUsado;
   ['preco','usado','revenda','dias'].forEach(i=>$(i).addEventListener('input',calc));
   $('trocaS').onclick=()=>setTroca(true);$('trocaN').onclick=()=>setTroca(false);
-  initUsados();seg();calc();
+  initUsados();seg();calc();initSemi();
 })();
 </script>
 </body>
