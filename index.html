@@ -80,7 +80,6 @@ const CONFIG = {
   selic: 15,                                 // % ao ano — custo do usado parado
   desvalorizacaoUsado: 0,                    // % ao mês (opcional)
   diasPadraoUsado: 30,                       // prazo médio para vender o usado
-  senhaDiretoria: "iblack"                   // senha do modo diretoria (troque!)
 };
 let USADOS = [];   // carregado de dados.json (criptografado)
 let EXEMPLO = [];
@@ -88,7 +87,7 @@ let EXEMPLO = [];
 
 <header>
   <div class="brand">IBLACK<small>Aprovação de venda e desconto</small></div>
-  <button class="btn ghost" id="btnDir" onclick="modoDiretoria()">Diretoria</button>
+  <div style="display:flex;align-items:center;gap:10px"><span id="quem" style="color:var(--mut);font-size:13px"></span><button class="btn ghost hide" id="btnSair" onclick="sair()">Sair</button></div>
 </header>
 <div class="banner hide" id="banner"><div id="bannerTxt"></div></div>
 
@@ -132,8 +131,9 @@ let EXEMPLO = [];
   </section>
 </main>
 <p class="foot" id="foot"></p>
-<div class="lock hide" id="lock"><form id="lockForm"><h3>IBLACK</h3><p>Digite a senha da loja para abrir a tabela de aparelhos.</p>
-<input type="password" id="lockPw" autocomplete="current-password" placeholder="Senha da loja"><div class="err" id="lockErr"></div>
+<div class="lock hide" id="lock"><form id="lockForm"><h3>IBLACK</h3><p>Entre com seu usuário e senha.</p>
+<input id="lockUser" autocomplete="username" autocapitalize="none" placeholder="Usuário" style="margin-bottom:8px">
+<input type="password" id="lockPw" autocomplete="current-password" placeholder="Senha"><div class="err" id="lockErr"></div>
 <button class="btn" style="width:100%;margin-top:6px">Entrar</button></form></div>
 
 <script>
@@ -158,35 +158,50 @@ function parseCSV(t){
   if(cur||row.length){row.push(cur);rows.push(row)}
   return rows;
 }
-/* ---------- dados criptografados (senha da loja) ---------- */
+/* ---------- login: usuário + senha (dados criptografados por usuário) ---------- */
 const b64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
-async function abrir(blob,senha){
-  const k0=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveKey']);
-  const k=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(blob.salt),iterations:blob.iter,hash:'SHA-256'},k0,{name:'AES-GCM',length:256},false,['decrypt']);
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(blob.iv)},k,b64(blob.ct));
-  return JSON.parse(new TextDecoder().decode(pt));
+const enc=new TextEncoder(), dec=new TextDecoder();
+async function sha(t){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(t)))].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function chave(senha,salt,iter){
+  const k0=await crypto.subtle.importKey('raw',enc.encode(senha),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},k0,{name:'AES-GCM',length:256},false,['decrypt']);
 }
-function pedirSenha(erro){
+async function entrar(blob,usuario,senha){
+  usuario=usuario.trim().toLowerCase();
+  const u=blob.usuarios[await sha('iblack:'+usuario)]; if(!u) throw 'login';
+  const ku=await chave(usuario+'\n'+senha,b64(u.salt),blob.iter);
+  const acesso=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(u.iv)},ku,b64(u.ct))));
+  const kd=await crypto.subtle.importKey('raw',b64(acesso.k),'AES-GCM',false,['decrypt']);
+  const dados=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(blob.iv)},kd,b64(blob.ct))));
+  return {acesso,dados};
+}
+function pedirLogin(erro){
   return new Promise(res=>{
-    $('lock').classList.remove('hide');$('lockErr').textContent=erro||'';$('lockPw').value='';$('lockPw').focus();
-    $('lockForm').onsubmit=e=>{e.preventDefault();$('lock').classList.add('hide');res($('lockPw').value)};
+    $('lock').classList.remove('hide');$('lockErr').textContent=erro||'';$('lockPw').value='';
+    ($('lockUser').value?$('lockPw'):$('lockUser')).focus();
+    $('lockForm').onsubmit=e=>{e.preventDefault();$('lock').classList.add('hide');res([$('lockUser').value,$('lockPw').value])};
   });
 }
+let sessao=null;
 async function carregar(){
   let blob;
   try{const r=await fetch(CONFIG.dados+'?t='+Date.now());if(!r.ok)throw 0;blob=await r.json()}
   catch(e){aviso('Não consegui carregar a tabela de aparelhos. Avise a diretoria.');return}
-  let senha=null;try{senha=localStorage.getItem('ib_senha')}catch(e){}
-  for(let tent=0;tent<10;tent++){
-    if(!senha) senha=await pedirSenha(tent?'Senha incorreta. Tente de novo.':'');
-    try{const d=await abrir(blob,senha);
-      try{localStorage.setItem('ib_senha',senha)}catch(e){}
-      EXEMPLO=d.novos;USADOS=d.usados;lista=EXEMPLO.slice();
-      if(d.atualizado)$('foot').textContent='Tabela atualizada em '+d.atualizado.split('-').reverse().join('/');
+  let salvo=null;try{salvo=JSON.parse(localStorage.getItem('ib_login')||'null')}catch(e){}
+  for(let tent=0;tent<20;tent++){
+    let cred=salvo; salvo=null;
+    if(!cred) cred=await pedirLogin(tent?'Usuário ou senha incorretos.':'');
+    try{const {acesso,dados}=await entrar(blob,cred[0],cred[1]);
+      try{localStorage.setItem('ib_login',JSON.stringify(cred))}catch(e){}
+      sessao=acesso;EXEMPLO=dados.novos;USADOS=dados.usados;lista=EXEMPLO.slice();
+      $('quem').textContent=acesso.nome;$('btnSair').classList.remove('hide');
+      if(acesso.perfil==='diretoria'){diretoria=true;$('dir').classList.remove('hide')}
+      if(dados.atualizado)$('foot').textContent='Tabela atualizada em '+dados.atualizado.split('-').reverse().join('/');
       return}
-    catch(e){senha=null;try{localStorage.removeItem('ib_senha')}catch(_){}}
+    catch(e){try{localStorage.removeItem('ib_login')}catch(_){}}
   }
 }
+function sair(){try{localStorage.removeItem('ib_login')}catch(e){};location.reload()}
 function aviso(t){$('banner').classList.remove('hide');$('bannerTxt').textContent=t}
 
 /* ---------- cálculo: novo e usado avaliados separadamente ---------- */
@@ -278,11 +293,6 @@ function initUsados(){
   $('modeloU').onchange=()=>{const u=USADOS[$('modeloU').value];
     if(u){$('usado').value=u.piso;$('revenda').value=u.rev;$('tetoU').innerHTML=`Piso <b>${brl(u.piso)}</b> · Teto <b>${brl(u.teto)}</b>`}else{$('tetoU').textContent=''}
     calc()};
-}
-function modoDiretoria(){
-  if(diretoria){diretoria=false;$('dir').classList.add('hide');$('btnDir').textContent='Diretoria';return}
-  if(prompt('Senha da diretoria')!==CONFIG.senhaDiretoria)return;
-  diretoria=true;$('dir').classList.remove('hide');$('btnDir').textContent='Sair';calc();
 }
 function seg(){
   const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
