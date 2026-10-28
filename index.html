@@ -369,7 +369,7 @@ function sCalcBase(){
 }
 function sCalc(){
   const r=sCalcBase(), um=USADOS[$('sModelo').value];
-  $('sRef').innerHTML=um?`Preço de mercado à vista: <b>${brl(um.rev)}</b>`:'Sem modelo: o preço sai só do custo.';
+  $('sRef').innerHTML=um?`Preço de mercado à vista: <b>${brl(um.rev)}</b>`:'Escolha o modelo acima (lista com todos os seminovos que compramos). Se não estiver na lista, o preço sai só do custo.';
   if(!r){$('sStatus').className='status';$('sStatus').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo do aparelho</div>';$('sFaixas').innerHTML='';$('sDet').innerHTML='';return}
   const fx=(k,t,v,s)=>`<div class="fx ${k}"><span>${t}<small>${s}</small></span><b>${v}</b></div>`;
   const nome={avista:'À vista',x12:'12x com juros',x18:'18x com juros'};
@@ -398,7 +398,7 @@ function sCalc(){
 }
 function initSemi(){
   const g={};USADOS.forEach((u,i)=>{(g[u.s]=g[u.s]||[]).push(`<option value="${i}">${u.m} ${u.c}</option>`)});
-  $('sModelo').innerHTML='<option value="">Outro modelo</option>'+Object.entries(g).map(([k,o])=>`<optgroup label="${k}">${o.join('')}</optgroup>`).join('');
+  $('sModelo').innerHTML='<option value="">▼ Toque aqui e escolha o modelo</option>'+Object.entries(g).map(([k,o])=>`<optgroup label="${k}">${o.join('')}</optgroup>`).join('');
   $('sModelo').onchange=sCalc; $('sCusto').addEventListener('input',sCalc); $('sPreco').addEventListener('input',sCalc);
   $('sBatN').onclick=()=>sSetBat(false); $('sBatS').onclick=()=>sSetBat(true);
   sSeg(); sCalc();
