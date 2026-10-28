@@ -92,6 +92,7 @@ const CONFIG = {
   diasPadraoUsado: 30,
   diasAlertaParado: 60,                      // acima disso, alerta de aparelho parado na venda de seminovo
   lucroSobreCustoSeminovo: 20,               // seminovo: lucro mínimo de 20% SOBRE O CUSTO (entrada + parado + cabo + bateria)
+  lucroMinimoSeminovoReais: 800,             // seminovo: lucro mínimo em reais (vale o maior entre isso e os 20%)
   custoBateria: 500,                         // troca de bateria quando a saúde está abaixo do limite
   saudeMinBateria: 90,                       // % de saúde abaixo do qual a bateria é trocada
 };
@@ -238,6 +239,7 @@ async function carregar(){
       sessao=acesso;EXEMPLO=dados.novos;USADOS=dados.usados;lista=EXEMPLO.slice();
       $('quem').textContent=acesso.nome;$('btnSair').classList.remove('hide');
       if(acesso.perfil==='diretoria'){diretoria=true;$('dir').classList.remove('hide')}
+      if(acesso.perfil==='estoque'){document.querySelector('.tabs').classList.add('hide');aba('B')}
       if(dados.atualizado)$('foot').textContent='Tabela atualizada em '+dados.atualizado.split('-').reverse().join('/');
       return}
     catch(e){try{localStorage.removeItem('ib_login')}catch(_){}}
@@ -384,11 +386,12 @@ function sCalcBase(){
   const bat=sBat?CONFIG.custoBateria:0, parado=T*(CONFIG.selic/100)*dias/365, custoTot=T+parado+cabo+bat;
   const um=USADOS[$('sModelo').value], ref=um&&um.rev?um.rev:0;
   const min={},preco={};
-  for(const p of ['avista','x12','x18']) min[p]=custoTot*(1+k)/(1-c-taxa(p));        // menor preço com o lucro mínimo
+  const lucroMin=Math.max(custoTot*k,CONFIG.lucroMinimoSeminovoReais);
+  for(const p of ['avista','x12','x18']) min[p]=(custoTot+lucroMin)/(1-c-taxa(p));   // menor preço que garante o lucro mínimo (já descontando comissão e taxa)
   preco.avista=r9(Math.max(min.avista,ref));
   for(const p of ['x12','x18']) preco[p]=r9(Math.max(preco.avista/(1-taxa(p)),min[p]));  // juros da maquininha repassados
   const lucro=p=>preco[p]*(1-c-taxa(p))-custoTot;
-  return {T,dias,bat,cabo,parado,custoTot,min,preco,ref,um,c,k,lucro};
+  return {T,dias,bat,cabo,parado,custoTot,min,preco,ref,um,c,k,lucro,lucroMin};
 }
 function sCalc(){
   const r=sCalcBase(), um=USADOS[$('sModelo').value];
@@ -397,13 +400,13 @@ function sCalc(){
   const fx=(k,t,v,s)=>`<div class="fx ${k}"><span>${t}<small>${s}</small></span><b>${v}</b></div>`;
   const nome={avista:'À vista',x12:'12x com juros',x18:'18x com juros'};
   $('sStatus').className='status s-ok';
-  $('sStatus').innerHTML=`<div class="lbl">Cadastrar à vista por</div><div class="big">${brl(r.preco.avista)}</div><div class="sub">Custo considerado ${brl(r.custoTot)}${r.bat?' (inclui bateria de '+brl(r.bat)+')':''} · lucro mínimo de ${r.k*100}% sobre o custo.</div>`;
+  $('sStatus').innerHTML=`<div class="lbl">Cadastrar à vista por</div><div class="big">${brl(r.preco.avista)}</div><div class="sub">Custo considerado ${brl(r.custoTot)}${r.bat?' (inclui bateria de '+brl(r.bat)+')':''} · lucro mínimo garantido de ${brl(r.lucroMin)} (o maior entre ${r.k*100}% do custo e ${brl(CONFIG.lucroMinimoSeminovoReais)}), já descontada a comissão.</div>`;
   let h='';
   for(const p of ['avista','x12','x18']){const n=p==='avista'?1:+p.slice(1);
     h+=fx('ok',nome[p],brl(r.preco[p]),n>1?`${n}x de ${brl(r.preco[p]/n)}`:'Pix ou dinheiro')}
   const piso=Math.ceil(r.min.avista), dmax=r.preco.avista-piso;
-  h+=fx(dmax>0?'ok':'warn','Desconto máximo à vista',brl(Math.max(dmax,0)),dmax>0?`menor valor aceito: ${brl(piso)}`:'sem desconto — vender pelo preço cadastrado');
-  if(r.ref&&r.min.avista>r.ref) h+=`<div class="hint">⚠️ Para manter ${r.k*100}% o preço ficou ${brl(r.preco.avista-r.ref)} acima do mercado (${brl(r.ref)}). Esse aparelho foi comprado caro.</div>`;
+  h+=fx(dmax>0?'ok':'warn','Desconto máximo à vista',brl(Math.max(dmax,0)),dmax>0?`menor valor aceito: ${brl(piso)} · ainda sobra ${brl(r.lucroMin)} de lucro`:'sem desconto — vender pelo preço cadastrado');
+  if(r.ref&&r.min.avista>r.ref) h+=`<div class="hint">⚠️ Para manter o lucro mínimo o preço ficou ${brl(r.preco.avista-r.ref)} acima do mercado (${brl(r.ref)}). Esse aparelho foi comprado caro.</div>`;
   const P=num('sPreco');
   if(P){const f=taxa(sPag),l=P*(1-r.c-f)-r.custoTot,mk=l/r.custoTot*100,ok=P>=Math.ceil(r.min[sPag]),n=sPag==='avista'?'à vista':sPag.slice(1)+'x';
     h+=fx(ok?'ok':'bad',`Proposta de ${brl(P)} ${n}`,ok?'Pode':'Não pode',ok?`lucro de ${brl(l)} (${pct(mk)} sobre o custo)`:`menor valor ${n}: ${brl(Math.ceil(r.min[sPag]))} · assim o lucro fica em ${pct(mk)}`)}
