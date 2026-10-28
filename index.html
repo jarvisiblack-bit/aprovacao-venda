@@ -357,7 +357,7 @@ function setTroca(v){troca=v;$('trocaS').classList.toggle('on',v);$('trocaN').cl
 
 /* ---------- aba: venda de seminovo ---------- */
 let sPag='avista', sBat=false;
-const r9=v=>Math.ceil((v+1)/10)*10-1;            // arredonda para cima terminando em 9 (5.509, 6.269...)
+const r9=v=>Math.ceil((v+1)/100)*100-1;          // arredonda para cima no próximo final 99 (1.929 → 1.999, 2.139 → 2.199)
 function picker(id){
   const sel=$(id); sel.classList.add('hide');
   let btn=$(id+'Btn'), box=$(id+'Box');
