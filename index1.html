@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBLACK · Aprovação de Venda</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0b;--card:#141416;--card2:#1b1b1e;--line:#2a2a2e;--txt:#f4f4f5;--mut:#9a9aa2;
+        --ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45}
+  header{padding:22px 16px 10px;max-width:980px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{font-weight:800;letter-spacing:.18em;font-size:20px}
+  .brand small{display:block;font-weight:500;letter-spacing:.02em;color:var(--mut);font-size:13px;margin-top:2px}
+  main{max-width:980px;margin:0 auto;padding:8px 16px 60px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .card h2{margin:0 0 14px;font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--mut);font-weight:600}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:13px;color:var(--mut);margin:0 0 5px}
+  .field{margin-bottom:12px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px}
+  input:focus,select:focus{outline:none;border-color:#666}
+  .hint{font-size:12.5px;color:var(--mut);margin-top:5px}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+  .seg button{background:var(--card2);border:1px solid var(--line);color:var(--txt);padding:10px 4px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+  .seg button.on{background:#fff;color:#000;border-color:#fff}
+  .yn{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .yn button{background:var(--card2);border:1px solid var(--line);color:var(--txt);padding:11px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+  .yn button.on{background:#fff;color:#000;border-color:#fff}
+  .troca{border-top:1px dashed var(--line);padding-top:12px}
+  .hide{display:none!important}
+  .status{border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid var(--line)}
+  .status .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--mut)}
+  .status .big{font-size:28px;font-weight:800;margin:6px 0 4px;line-height:1.15}
+  .status .sub{color:var(--mut);font-size:14px}
+  .s-ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.09)} .s-ok .lbl,.s-ok .big{color:var(--ok)}
+  .s-warn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.09)} .s-warn .lbl,.s-warn .big{color:var(--warn)}
+  .s-bad{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.09)} .s-bad .lbl,.s-bad .big{color:var(--bad)}
+  .faixas{display:flex;flex-direction:column;gap:8px}
+  .fx{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card2);border-radius:12px;padding:12px 14px;border-left:4px solid}
+  .fx b{font-size:17px;white-space:nowrap} .fx span{font-size:13.5px}
+  .fx small{display:block;color:var(--mut);font-size:12px}
+  .fx.ok{border-color:var(--ok)} .fx.warn{border-color:var(--warn)} .fx.bad{border-color:var(--bad)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td{padding:7px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  td:first-child{text-align:left;white-space:normal}
+  tr.tot td{font-weight:700;border-bottom:none}
+  .sec td{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.08em;padding-top:14px;border-bottom:none}
+  .neg{color:var(--bad)} .pos{color:var(--ok)}
+  .btn{background:#fff;color:#000;border:none;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  .banner{max-width:980px;margin:0 auto 4px;padding:0 16px}
+  .banner div{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);color:#fcd34d;border-radius:12px;padding:10px 14px;font-size:13.5px}
+  .foot{color:var(--mut);font-size:12px;text-align:center;padding:0 16px 30px}
+  .lock{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+  .lock form{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;width:100%;max-width:340px}
+  .lock h3{margin:0 0 6px;letter-spacing:.14em} .lock p{color:var(--mut);font-size:13.5px;margin:0 0 14px}
+  .lock .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+</style>
+</head>
+<body>
+<script>
+/* =====================================================================
+   CONFIGURAÇÃO — só a diretoria mexe aqui
+   ===================================================================== */
+const CONFIG = {
+  // Link da planilha Google publicada como CSV
+  // (Arquivo → Compartilhar → Publicar na Web → aba de custos → CSV). Deixe "" para usar a lista de exemplo.
+  dados: "dados.json",                      // arquivo criptografado gerado a partir do Notion
+  taxas: { avista: 0, x12: 12, x18: 15 },   // % da maquininha sobre o valor passado no cartão
+  comissao: 0.5,                             // % sobre o preço de venda
+  margemMinima: 15,
+  descontoMaxSobre12x: 12,                   // % máximo de desconto, sempre calculado sobre o preço oficial em 12x                          // % de lucro mínimo — vale para o novo e para o usado, cada um sozinho
+  taxaRevendaUsado: 0,                       // seminovo: parcelado é repassado ao cliente (12x = à vista + 12%)
+  selic: 15,                                 // % ao ano — custo do usado parado
+  desvalorizacaoUsado: 0,                    // % ao mês (opcional)
+  diasPadraoUsado: 30,                       // prazo médio para vender o usado
+  senhaDiretoria: "iblack"                   // senha do modo diretoria (troque!)
+};
+let USADOS = [];   // carregado de dados.json (criptografado)
+let EXEMPLO = [];
+</script>
+
+<header>
+  <div class="brand">IBLACK<small>Aprovação de venda e desconto</small></div>
+  <button class="btn ghost" id="btnDir" onclick="modoDiretoria()">Diretoria</button>
+</header>
+<div class="banner hide" id="banner"><div id="bannerTxt"></div></div>
+
+<main>
+  <section class="card">
+    <h2>Proposta</h2>
+    <div class="field">
+      <label>Aparelho</label>
+      <select id="aparelho"></select>
+      <div class="hint" id="tabela"></div>
+    </div>
+    <div class="field">
+      <label>Valor que o cliente quer pagar no aparelho (R$)</label>
+      <input type="number" step="0.01" id="preco" inputmode="decimal">
+      <div class="hint">Valor cheio do aparelho, antes de abater o usado. Já vem com o preço oficial da forma de pagamento escolhida.</div>
+    </div>
+    <label>Pagamento</label>
+    <div class="seg" id="seg"></div>
+
+    <label>Tem aparelho na troca?</label>
+    <div class="yn"><button id="trocaN" class="on">Não</button><button id="trocaS">Sim</button></div>
+    <div id="trocaBox" class="troca hide">
+      <div class="field"><label>Modelo do usado</label><select id="modeloU"></select><div class="hint" id="tetoU"></div></div>
+      <div class="row">
+        <div class="field"><label>Valor oferecido pelo usado (R$)</label><input type="number" step="0.01" id="usado" inputmode="decimal"></div>
+        <div class="field"><label>Revenda à vista prevista (R$)</label><input type="number" step="0.01" id="revenda" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label>Dias até vender o usado</label><input type="number" step="1" min="0" id="dias" inputmode="numeric"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Resposta</h2>
+    <div class="status" id="status"><div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Escolha o aparelho e o valor</div></div>
+    <div class="faixas" id="faixas"></div>
+  </section>
+
+  <section class="card full hide" id="dir">
+    <h2>Diretoria · detalhe da operação</h2>
+    <div style="overflow-x:auto"><table id="det"></table></div>
+  </section>
+</main>
+<p class="foot" id="foot"></p>
+<div class="lock hide" id="lock"><form id="lockForm"><h3>IBLACK</h3><p>Digite a senha da loja para abrir a tabela de aparelhos.</p>
+<input type="password" id="lockPw" autocomplete="current-password" placeholder="Senha da loja"><div class="err" id="lockErr"></div>
+<button class="btn" style="width:100%;margin-top:6px">Entrar</button></form></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const brl=v=>(v<0?'−':'')+'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct=v=>(isFinite(v)?v:0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const num=id=>parseFloat($(id).value)||0;
+let lista=[], pag='x12', troca=false, diretoria=false;
+
+/* ---------- leitura da planilha Google ---------- */
+function parseNum(s){
+  s=String(s||'').replace(/R\$|\s/g,'');
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.');
+  return parseFloat(s)||0;
+}
+function parseCSV(t){
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch=='"'){if(t[i+1]=='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch=='"')q=true; else if(ch==','){row.push(cur);cur=''}
+    else if(ch=='\n'){row.push(cur);rows.push(row);row=[];cur=''} else if(ch!='\r')cur+=ch}
+  if(cur||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+/* ---------- dados criptografados (senha da loja) ---------- */
+const b64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function abrir(blob,senha){
+  const k0=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveKey']);
+  const k=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(blob.salt),iterations:blob.iter,hash:'SHA-256'},k0,{name:'AES-GCM',length:256},false,['decrypt']);
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(blob.iv)},k,b64(blob.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+function pedirSenha(erro){
+  return new Promise(res=>{
+    $('lock').classList.remove('hide');$('lockErr').textContent=erro||'';$('lockPw').value='';$('lockPw').focus();
+    $('lockForm').onsubmit=e=>{e.preventDefault();$('lock').classList.add('hide');res($('lockPw').value)};
+  });
+}
+async function carregar(){
+  let blob;
+  try{const r=await fetch(CONFIG.dados+'?t='+Date.now());if(!r.ok)throw 0;blob=await r.json()}
+  catch(e){aviso('Não consegui carregar a tabela de aparelhos. Avise a diretoria.');return}
+  let senha=null;try{senha=localStorage.getItem('ib_senha')}catch(e){}
+  for(let tent=0;tent<10;tent++){
+    if(!senha) senha=await pedirSenha(tent?'Senha incorreta. Tente de novo.':'');
+    try{const d=await abrir(blob,senha);
+      try{localStorage.setItem('ib_senha',senha)}catch(e){}
+      EXEMPLO=d.novos;USADOS=d.usados;lista=EXEMPLO.slice();
+      if(d.atualizado)$('foot').textContent='Tabela atualizada em '+d.atualizado.split('-').reverse().join('/');
+      return}
+    catch(e){senha=null;try{localStorage.removeItem('ib_senha')}catch(_){}}
+  }
+}
+function aviso(t){$('banner').classList.remove('hide');$('bannerTxt').textContent=t}
+
+/* ---------- cálculo: novo e usado avaliados separadamente ---------- */
+function taxa(p){return CONFIG.taxas[p==='avista'?'avista':p]/100}
+function calcular(custo,P,d){
+  const c=CONFIG.comissao/100,f=taxa(pag),fU=CONFIG.taxaRevendaUsado/100,m=CONFIG.margemMinima/100;
+  const T=d.troca?d.usado:0,R=d.troca?d.revenda:0,dias=d.troca?d.dias:0;
+  // NOVO: o usado entra como parte do pagamento; taxa só sobre o que passa no cartão
+  const noCartao=Math.max(P-T,0);
+  const lucroN=P-custo-c*P-f*noCartao, margN=P?lucroN/P*100:0;
+  const pMin=(custo-f*Math.min(T,P))/(1-c-f-m);           // menor preço do novo com 15%
+  // USADO: comprado por T, revendido por R
+  const kSel=(CONFIG.selic/100)*dias/365, desvR=R*(CONFIG.desvalorizacaoUsado/100)*dias/30;
+  const parado=T*kSel+desvR;
+  const lucroU=R-T-c*R-fU*R-parado, margU=R?lucroU/R*100:0;
+  let tMax=(R*(1-c-fU-m)-desvR)/(1+kSel);                  // máximo a pagar no usado com 15%
+  const um=USADOS[$('modeloU').value]; if(um) tMax=Math.min(tMax,um.teto);   // teto oficial da tabela
+  return {T,R,dias,noCartao,comN:c*P,taxN:f*noCartao,lucroN,margN,pMin,
+          comU:c*R,taxU:fU*R,parado,lucroU,margU,tMax};
+}
+
+/* ---------- tela ---------- */
+function calc(){
+  const it=lista[$('aparelho').value]; if(!it)return;
+  const [nome,custo,precos]=it, tab=precos[pag]||0, P=num('preco');
+  $('trocaBox').classList.toggle('hide',!troca);
+  const parc=pag==='avista'?1:parseInt(pag.slice(1));
+  $('tabela').innerHTML=tab?`Preço oficial ${pag==='avista'?'à vista':'em '+parc+'x'}: <b>${brl(tab)}</b>${parc>1?' ('+parc+'x de '+brl(tab/parc)+')':''}`:'Sem preço oficial cadastrado para esse pagamento';
+  if(!custo){
+    $('status').className='status s-warn';
+    $('status').innerHTML=`<div class="lbl">Sob encomenda</div><div class="big">Fale com a diretoria</div><div class="sub">Esse aparelho ainda não foi comprado, então não tem custo cadastrado. A diretoria precisa cotar e fazer o pedido antes de fechar o valor.${tab?' Preço oficial nesse pagamento: '+brl(tab)+'.':''}</div>`;
+    let h='';
+    if(troca&&num('revenda')>0){const r=calcular(0,0,{troca,usado:num('usado'),revenda:num('revenda'),dias:num('dias')});h=blocoUsado(r,num('usado'))}
+    $('faixas').innerHTML=h+'<div class="hint">Anote os dados do cliente e da troca e passe para a diretoria.</div>';$('det').innerHTML='';return}
+  if(!P){$('status').className='status';$('status').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Digite o valor da proposta</div>';$('faixas').innerHTML='';$('det').innerHTML='';return}
+  const d={troca,usado:num('usado'),revenda:num('revenda'),dias:num('dias')};
+  const r=calcular(custo,P,d), m=CONFIG.margemMinima;
+  // preço oficial é sempre aprovado; desconto só até onde sobrar 15%
+  const teto12=precos.x12?precos.x12*(1-CONFIG.descontoMaxSobre12x/100):0;   // trava: 12% sobre o 12x
+  const piso=Math.max(r.pMin,teto12), travaPor=teto12>r.pMin?'teto':'margem';
+  const minimo=tab?Math.min(tab,piso):piso, dMax=tab?Math.max(tab-piso,0):0;
+  const okN=P>=minimo-0.005, temU=troca&&d.revenda>0, okU=!temU||d.usado<=r.tMax+0.5;
+  const desc=tab&&P<tab?` (${brl(tab-P)} de desconto)`:'';
+  let cls,lbl,big,sub=[];
+  if(okN&&okU){cls='s-ok';lbl='Pode fechar';big='Venda aprovada'}
+  else{cls='s-bad';lbl='Não pode fechar assim';big=!okN&&!okU?'Desconto e troca acima do limite':!okN?'Desconto acima do limite':'Usado avaliado acima do limite'}
+  if(!okN)sub.push(`O menor valor para o aparelho é <b>${brl(minimo)}</b>.`);
+  if(!okU)sub.push(`O máximo a pagar no usado é <b>${brl(r.tMax)}</b>.`);
+  const ok=okN&&okU, txtOk=tab&&P>=tab?'Preço oficial da tabela.':'Dentro do desconto permitido.';
+  $('status').className='status '+cls;
+  $('status').innerHTML=`<div class="lbl">${lbl}</div><div class="big">${big}</div><div class="sub">Proposta: ${brl(P)}${desc}. ${ok?txtOk:sub.join(' ')}</div>`;
+  const fx=(k,t,v,s)=>`<div class="fx ${k}"><span>${t}<small>${s}</small></span><b>${v}</b></div>`;
+  let h=fx(okN?'ok':'bad', tab?'Desconto máximo no aparelho':'Menor valor permitido no aparelho', tab?brl(dMax):brl(r.pMin),
+     !tab?`com ${m}% de lucro nesse pagamento`
+        :dMax>0?`menor valor: ${brl(minimo)} (oficial ${brl(tab)}) · limite pela ${travaPor==='teto'?'regra de '+CONFIG.descontoMaxSobre12x+'% sobre o 12x ('+brl(precos.x12)+')':'margem mínima de '+m+'%'}`
+        :`sem desconto nesse pagamento — vender pelo preço oficial de ${brl(tab)}`);
+  if(temU) h+=blocoUsado(r,d.usado);
+  if(troca&&!temU) h+=`<div class="hint">Informe a revenda prevista para avaliar o usado.</div>`;
+  h+=`<div class="hint">Regra: o aparelho e o usado precisam dar pelo menos ${m}% de lucro, cada um.${troca?' O valor do usado abate o que passa no cartão, por isso a troca reduz a taxa.':''}</div>`;
+  $('faixas').innerHTML=h;
+  if(diretoria){
+    const L=(a,b,k)=>`<tr><td>${a}</td><td class="${k||''}">${b}</td></tr>`;
+    let t=`<tr class="sec"><td colspan="2">Venda do novo · ${pag==='avista'?'à vista':pag.slice(1)+'x'}</td></tr>`+
+      L('Preço',brl(P))+L('Custo do aparelho',brl(-custo),'neg')+
+      L(`Comissão ${CONFIG.comissao}%`,brl(-r.comN),'neg')+
+      L(`Taxa sobre ${brl(r.noCartao)} no cartão${troca?' (usado abate '+brl(Math.min(r.T,P))+')':''}`,brl(-r.taxN),'neg')+
+      `<tr class="tot"><td>Lucro do novo · ${pct(r.margN)}</td><td class="${r.lucroN<0?'neg':'pos'}">${brl(r.lucroN)}</td></tr>`;
+    if(temU)t+=`<tr class="sec"><td colspan="2">Revenda do usado</td></tr>`+L('Revenda',brl(r.R))+
+      L('Valor pago na troca',brl(-r.T),'neg')+L(`Comissão ${CONFIG.comissao}%`,brl(-r.comU),'neg')+(r.taxU?L('Taxa',brl(-r.taxU),'neg'):'')+
+      L(`Usado parado ${r.dias} dias`,brl(-r.parado),'neg')+
+      `<tr class="tot"><td>Lucro do usado · ${pct(r.margU)}</td><td class="${r.lucroU<0?'neg':'pos'}">${brl(r.lucroU)}</td></tr>`;
+    $('det').innerHTML=t;
+  }
+}
+function blocoUsado(r,pago){
+  const m=CONFIG.margemMinima, acima=pago-r.tMax, um=USADOS[$('modeloU').value];
+  let h=`<div class="fx ${acima<=0.5?'ok':'bad'}"><span>Teto para pagar no usado<small>${um?'tabela de compra · piso '+brl(um.piso)+' para abrir a negociação':'revenda de '+brl(r.R)+' em até '+r.dias+' dias com '+m+'% de lucro'}</small></span><b>${brl(Math.max(r.tMax,0))}</b></div>`;
+  if(pago>0){
+    const k=(CONFIG.selic/100)*r.dias/365, perda=Math.max(acima,0)*(1+k);
+    h+= acima>0.5
+      ? `<div class="fx bad"><span>Oferta ${brl(acima)} acima do teto<small>a loja perde ${brl(perda)} de lucro · margem do usado cai para ${pct(r.margU)}${r.lucroU<0?' (prejuízo)':''}</small></span><b>${pct(r.margU)}</b></div>`
+      : `<div class="fx ok"><span>Oferta dentro do teto<small>sobra ${brl(-acima)} até o teto · margem do usado ${pct(r.margU)}</small></span><b>${pct(r.margU)}</b></div>`;
+  }
+  return h;
+}
+function initUsados(){
+  const g={};USADOS.forEach((u,i)=>{(g[u.s]=g[u.s]||[]).push(`<option value="${i}">${u.m} ${u.c}</option>`)});
+  $('modeloU').innerHTML='<option value="">Outro modelo (digitar revenda)</option>'+Object.entries(g).map(([k,o])=>`<optgroup label="${k}">${o.join('')}</optgroup>`).join('');
+  $('modeloU').onchange=()=>{const u=USADOS[$('modeloU').value];
+    if(u){$('usado').value=u.piso;$('revenda').value=u.rev;$('tetoU').innerHTML=`Piso <b>${brl(u.piso)}</b> · Teto <b>${brl(u.teto)}</b>`}else{$('tetoU').textContent=''}
+    calc()};
+}
+function modoDiretoria(){
+  if(diretoria){diretoria=false;$('dir').classList.add('hide');$('btnDir').textContent='Diretoria';return}
+  if(prompt('Senha da diretoria')!==CONFIG.senhaDiretoria)return;
+  diretoria=true;$('dir').classList.remove('hide');$('btnDir').textContent='Sair';calc();
+}
+function seg(){
+  const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
+  $('seg').innerHTML=o.map(([v,t])=>`<button data-v="${v}" class="${v===pag?'on':''}">${t}</button>`).join('');
+  $('seg').querySelectorAll('button').forEach(b=>b.onclick=()=>{pag=b.dataset.v;seg();precoOficial();calc()});
+}
+function precoOficial(){const it=lista[$('aparelho').value];$('preco').value=it&&it[2][pag]?it[2][pag]:''}
+function setTroca(v){troca=v;$('trocaS').classList.toggle('on',v);$('trocaN').classList.toggle('on',!v);calc()}
+
+(async()=>{
+  await carregar();
+  const grupos={};lista.forEach((x,i)=>{(grupos[x[3]||'Produtos']=grupos[x[3]||'Produtos']||[]).push(`<option value="${i}">${x[0]}${x[1]?'':' · sob encomenda'}</option>`)});
+  $('aparelho').innerHTML=Object.entries(grupos).map(([g,o])=>`<optgroup label="${g}">${o.join('')}</optgroup>`).join('');
+  $('aparelho').onchange=()=>{precoOficial();calc()};
+  precoOficial();
+  $('dias').value=CONFIG.diasPadraoUsado;
+  ['preco','usado','revenda','dias'].forEach(i=>$(i).addEventListener('input',calc));
+  $('trocaS').onclick=()=>setTroca(true);$('trocaN').onclick=()=>setTroca(false);
+  initUsados();seg();calc();
+})();
+</script>
+</body>
+</html>
