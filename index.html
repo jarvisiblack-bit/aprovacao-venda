@@ -191,6 +191,16 @@ let EXEMPLO = [];
     <div class="faixas" id="pDet"></div>
   </section>
   <section class="card full">
+    <h2>Calculadora de margem</h2>
+    <div class="row">
+      <div class="field"><label>Custo (R$)</label><input type="number" step="0.01" id="cCusto" inputmode="decimal" placeholder="ex.: 100"></div>
+      <div class="field"><label>Preço de venda (R$)</label><input type="number" step="0.01" id="cPreco" inputmode="decimal" placeholder="ex.: 199,90"></div>
+    </div>
+    <label>Pagamento nesse preço</label>
+    <div class="seg" id="cSeg" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="faixas" id="cRes"></div>
+  </section>
+  <section class="card full">
     <h2>Preço por margem</h2>
     <div style="overflow-x:auto"><table id="pTab"></table></div>
     <div class="hint" id="pTabHint"></div>
@@ -402,7 +412,7 @@ const rP=v=>v<1000?Math.ceil((v+0.1)/10)*10-0.1:Math.ceil((v+1)/100)*100-1;   //
 function pCalc(){
   const C=num('pCusto'), c=num('pCom')/100, nome=$('pNome').value.trim()||'Produto';
   if(!C){$('pStatus').className='status';$('pStatus').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo do produto</div>';$('pDet').innerHTML='';$('pTab').innerHTML='';$('pTabHint').textContent='';return}
-  const ms=[30,40,50,60,70,80,90,100], parc=[['x10',10],['x12',12],['x18',18]];
+  const ms=Array.from({length:18},(_,i)=>30+i*10), parc=[['x10',10],['x12',12],['x18',18]];
   const sob=(P,f)=>P*(1-c-f)-C;
   const linha=m=>{const P=rP(C*(1+m/100)), j={};parc.forEach(([k])=>j[k]=rP(P/(1-taxa(k))));return {m,P,j,s:sob(P,0)}};
   const L=ms.map(linha); if(pSel===null||!ms.includes(pSel)) pSel=CONFIG.precMargemMin;
@@ -420,7 +430,23 @@ function pCalc(){
   $('pTab').querySelectorAll('tr[data-m]').forEach(tr=>tr.onclick=()=>{pSel=+tr.dataset.m;pCalc()});
   $('pTabHint').textContent=`Sobra = preço − comissão de ${pct(c*100)} − custo. No parcelado com juros a taxa da maquininha é repassada ao cliente, então a sobra fica quase igual à do à vista.`;
 }
-function initPrec(){$('pCom').value=CONFIG.precComissao;['pNome','pCusto','pCom'].forEach(i=>$(i).addEventListener('input',pCalc));pCalc()}
+let cPag='avista';
+function cSeg(){const o=[['avista','À vista'],['x10','10x'],['x12','12x'],['x18','18x']];
+  $('cSeg').innerHTML=o.map(([v,t])=>`<button data-v="${v}" class="${v===cPag?'on':''}">${t}</button>`).join('');
+  $('cSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{cPag=b.dataset.v;cSeg();cCalc()})}
+function cCalc(){
+  const C=num('cCusto'),P=num('cPreco'),c=num('pCom')/100,f=taxa(cPag),fx=(k,t,v,s2)=>`<div class="fx ${k}"><span>${t}<small>${s2}</small></span><b>${v}</b></div>`;
+  if(!C||!P){$('cRes').innerHTML='<div class="hint">Digite o custo e o preço que vocês imaginam.</div>';return}
+  const mg=(P-C)/C*100, tx=P*f, com=P*c, sob=P-tx-com-C, real=sob/C*100, n=cPag==='avista'?'à vista':cPag.slice(1)+'x sem juros';
+  const k=mg>=CONFIG.precMargemMin?'ok':'bad';
+  let h=fx(k,'Margem sobre o custo',pct(mg),`${brl(P)} sobre custo de ${brl(C)}${mg<CONFIG.precMargemMin?' · abaixo do mínimo de '+CONFIG.precMargemMin+'%':''}`);
+  h+=fx(sob>=0?(real>=CONFIG.precMargemMin?'ok':'warn'):'bad',`Sobra no final (${n})`,brl(sob),`menos comissão ${pct(c*100)} (${brl(com)})${tx?' e taxa '+pct(f*100)+' ('+brl(tx)+')':''} · ${pct(real)} sobre o custo · ${pct(P?sob/P*100:0)} sobre a venda`);
+  $('cRes').innerHTML=h;
+}
+function initPrec(){$('pCom').value=CONFIG.precComissao;['pNome','pCusto','pCom'].forEach(i=>$(i).addEventListener('input',()=>{pCalc();cCalc()}));
+  $('pCusto').addEventListener('input',()=>{if(!$('cCusto').dataset.mexeu)$('cCusto').value=$('pCusto').value;cCalc()});
+  $('cCusto').addEventListener('input',()=>{$('cCusto').dataset.mexeu=1;cCalc()}); $('cPreco').addEventListener('input',cCalc);
+  cSeg();pCalc();cCalc()}
 function aba(x){if(x==='C'&&!diretoria)x='A';['A','B','C'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
 function sSeg(){
   const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
