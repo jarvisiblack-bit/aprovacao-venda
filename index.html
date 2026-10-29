@@ -414,7 +414,7 @@ function pCalc(){
   if(!C){$('pStatus').className='status';$('pStatus').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo do produto</div>';$('pDet').innerHTML='';$('pTab').innerHTML='';$('pTabHint').textContent='';return}
   const ms=Array.from({length:18},(_,i)=>30+i*10), parc=[['x10',10],['x12',12],['x18',18]];
   const sob=(P,f)=>P*(1-c-f)-C;
-  const linha=m=>{const P=rP(C*(1+m/100)), j={};parc.forEach(([k])=>j[k]=rP(P/(1-taxa(k))));return {m,P,j,s:sob(P,0)}};
+  const linha=m=>{const P=rP(C*(1+m/100)), j={};parc.forEach(([k])=>j[k]=rP(P*(1-c)/(1-c-taxa(k))));return {m,P,j,s:sob(P,0)}};
   const L=ms.map(linha); if(pSel===null||!ms.includes(pSel)) pSel=CONFIG.precMargemMin;
   const min=L[0], sel=L.find(x=>x.m===pSel);
   $('pStatus').className='status s-ok';
@@ -423,12 +423,13 @@ function pCalc(){
   let h=`<div class="hint" style="margin:0 0 2px"><b>Margem de ${sel.m}%</b> — como fica em cada pagamento</div>`;
   h+=fx('ok','À vista',brl(sel.P),`sobra ${brl(sel.s)} · ${pct(sel.s/C*100)} sobre o custo`);
   parc.forEach(([k,n])=>{const f=taxa(k),Pj=sel.j[k],sj=sob(Pj,f),ss=sob(sel.P,f);
-    h+=fx(ss>=0?'ok':'bad',`${n}x com juros (taxa ${pct(f*100)})`,brl(Pj),`${n}x de ${brl(Pj/n)} · sobra ${brl(sj)} · se vender ${n}x sem juros por ${brl(sel.P)}: sobra ${brl(ss)}`)});
+    h+=fx('ok',`${n}x com juros (taxa ${pct(f*100)} repassada)`,brl(Pj),`${n}x de ${brl(Pj/n)} · sobra ${brl(sj)} · ${pct(sj/C*100)} sobre o custo`)});
+  h+=`<div class="hint">No parcelado o cliente paga a taxa da maquininha, então a loja fica com o mesmo lucro do à vista (ou um pouco mais, pelo arredondamento). Para simular parcelado sem juros, use a calculadora de margem abaixo.</div>`;
   $('pDet').innerHTML=h;
   $('pTab').innerHTML=`<tr class="sec"><td>Margem</td><td>À vista</td><td>Sobra à vista</td><td>10x c/ juros</td><td>12x c/ juros</td><td>18x c/ juros</td></tr>`+
     L.map(x=>`<tr data-m="${x.m}" style="cursor:pointer${x.m===pSel?';background:var(--card2)':''}"><td><b>${x.m}%</b>${x.m===CONFIG.precMargemMin?' · mínimo':''}</td><td><b>${brl(x.P)}</b></td><td class="pos">${brl(x.s)}</td><td>${brl(x.j.x10)}</td><td>${brl(x.j.x12)}</td><td>${brl(x.j.x18)}</td></tr>`).join('');
   $('pTab').querySelectorAll('tr[data-m]').forEach(tr=>tr.onclick=()=>{pSel=+tr.dataset.m;pCalc()});
-  $('pTabHint').textContent=`Sobra = preço − comissão de ${pct(c*100)} − custo. No parcelado com juros a taxa da maquininha é repassada ao cliente, então a sobra fica quase igual à do à vista.`;
+  $('pTabHint').textContent=`Sobra = preço − comissão de ${pct(c*100)} − custo. Os preços parcelados já embutem a taxa da maquininha, então sobra pelo menos o mesmo valor do à vista.`;
 }
 let cPag='avista';
 function cSeg(){const o=[['avista','À vista'],['x10','10x'],['x12','12x'],['x18','18x']];
@@ -463,7 +464,7 @@ function sCalcBase(){
   const lucroMin=Math.max(custoTot*k,CONFIG.lucroMinimoSeminovoReais);
   for(const p of ['avista','x12','x18']) min[p]=(custoTot+lucroMin)/(1-c-taxa(p));   // menor preço que garante o lucro mínimo (já descontando comissão e taxa)
   preco.avista=r9(Math.max(min.avista,ref));
-  for(const p of ['x12','x18']) preco[p]=r9(Math.max(preco.avista/(1-taxa(p)),min[p]));  // juros da maquininha repassados
+  for(const p of ['x12','x18']) preco[p]=r9(Math.max(preco.avista*(1-c)/(1-c-taxa(p)),min[p]));  // juros da maquininha repassados
   const lucro=p=>preco[p]*(1-c-taxa(p))-custoTot;
   return {T,dias,bat,cabo,parado,custoTot,min,preco,ref,um,c,k,lucro,lucroMin};
 }
