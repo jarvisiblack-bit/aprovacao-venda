@@ -81,7 +81,7 @@
    ===================================================================== */
 const CONFIG = {
   dados: "dados.json",                      // arquivo criptografado gerado a partir do Notion
-  taxas: { avista: 0, x12: 12, x18: 15 },   // % da maquininha sobre o valor passado no cartão
+  taxas: { avista: 0, x10: 10, x12: 12, x18: 15 },   // % da maquininha sobre o valor passado no cartão
   comissao: 0.5,                             // % sobre o preço de venda
   margemMinima: 15,
   descontoMaxSobre12x: 12,                   // % máximo de desconto, sempre calculado sobre o preço oficial em 12x                          // % de lucro mínimo — vale para o novo e para o usado, cada um sozinho
@@ -93,6 +93,8 @@ const CONFIG = {
   diasAlertaParado: 60,                      // acima disso, alerta de aparelho parado na venda de seminovo
   lucroSobreCustoSeminovo: 20,               // seminovo: lucro mínimo de 20% SOBRE O CUSTO (entrada + parado + cabo + bateria)
   lucroMinimoSeminovoReais: 800,             // seminovo: lucro mínimo em reais (vale o maior entre isso e os 20%)
+  precMargemMin: 30,                         // precificação: margem mínima sobre o custo
+  precComissao: 3,                           // precificação: comissão do vendedor sobre a venda
   custoBateria: 500,                         // troca de bateria quando a saúde está abaixo do limite
   saudeMinBateria: 90,                       // % de saúde abaixo do qual a bateria é trocada
 };
@@ -104,7 +106,7 @@ let EXEMPLO = [];
   <div class="brand">IBLACK<small>Aprovação de venda e desconto</small></div>
   <div style="display:flex;align-items:center;gap:10px"><span id="quem" style="color:var(--mut);font-size:13px"></span><button class="btn ghost hide" id="btnSair" onclick="sair()">Sair</button></div>
 </header>
-<nav class="tabs"><button id="tabA" class="on" onclick="aba('A')">Venda de novo · troca</button><button id="tabB" onclick="aba('B')">Venda de seminovo</button></nav>
+<nav class="tabs"><button id="tabA" class="on" onclick="aba('A')">Venda de novo · troca</button><button id="tabB" onclick="aba('B')">Venda de seminovo</button><button id="tabC" class="hide" onclick="aba('C')">Precificação</button></nav>
 <div class="banner hide" id="banner"><div id="bannerTxt"></div></div>
 
 <main id="abaA">
@@ -173,6 +175,27 @@ let EXEMPLO = [];
     <div style="overflow-x:auto"><table id="sDet"></table></div>
   </section>
 </main>
+<main id="abaC" class="hide">
+  <section class="card">
+    <h2>Precificação de produto</h2>
+    <div class="field"><label>Produto</label><input id="pNome" placeholder="ex.: Estabilizador"></div>
+    <div class="row">
+      <div class="field"><label>Custo (R$)</label><input type="number" step="0.01" id="pCusto" inputmode="decimal" placeholder="ex.: 100"></div>
+      <div class="field"><label>Comissão do vendedor (%)</label><input type="number" step="0.1" id="pCom" inputmode="decimal"></div>
+    </div>
+    <div class="hint">Margem sobre o custo: 30% em cima de R$ 100 = R$ 130, arredondado para cima (abaixo de R$ 1.000 termina em 9,90; acima, em 99). Toque numa margem da tabela para ver o parcelado.</div>
+  </section>
+  <section class="card">
+    <h2>Resposta</h2>
+    <div class="status" id="pStatus"><div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo do produto</div></div>
+    <div class="faixas" id="pDet"></div>
+  </section>
+  <section class="card full">
+    <h2>Preço por margem</h2>
+    <div style="overflow-x:auto"><table id="pTab"></table></div>
+    <div class="hint" id="pTabHint"></div>
+  </section>
+</main>
 <p class="foot" id="foot"></p>
 <div class="lock hide" id="lock"><form id="lockForm"><h3>IBLACK</h3><p>Entre com seu usuário e senha.</p>
 <input id="lockUser" autocomplete="username" autocapitalize="none" placeholder="Usuário" style="margin-bottom:8px">
@@ -238,7 +261,7 @@ async function carregar(){
       try{localStorage.setItem('ib_login',JSON.stringify(cred))}catch(e){}
       sessao=acesso;EXEMPLO=dados.novos;USADOS=dados.usados;lista=EXEMPLO.slice();
       $('quem').textContent=acesso.nome;$('btnSair').classList.remove('hide');
-      if(acesso.perfil==='diretoria'){diretoria=true;$('dir').classList.remove('hide')}
+      if(acesso.perfil==='diretoria'){diretoria=true;$('dir').classList.remove('hide');$('tabC').classList.remove('hide')}
       if(acesso.perfil==='estoque'){document.querySelector('.tabs').classList.add('hide');aba('B')}
       if(dados.atualizado)$('foot').textContent='Tabela atualizada em '+dados.atualizado.split('-').reverse().join('/');
       return}
@@ -373,7 +396,32 @@ function picker(id){
   btn.onclick=()=>{box.classList.toggle('hide');draw()};
   draw(); sel._draw=draw;
 }
-function aba(x){['A','B'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
+/* ---------- aba: precificação (só diretoria) ---------- */
+let pSel=null;
+const rP=v=>v<1000?Math.ceil((v+0.1)/10)*10-0.1:Math.ceil((v+1)/100)*100-1;   // 130 → 139,90 · 2.139 → 2.199
+function pCalc(){
+  const C=num('pCusto'), c=num('pCom')/100, nome=$('pNome').value.trim()||'Produto';
+  if(!C){$('pStatus').className='status';$('pStatus').innerHTML='<div class="lbl">Aguardando</div><div class="big">—</div><div class="sub">Informe o custo do produto</div>';$('pDet').innerHTML='';$('pTab').innerHTML='';$('pTabHint').textContent='';return}
+  const ms=[30,40,50,60,70,80,90,100], parc=[['x10',10],['x12',12],['x18',18]];
+  const sob=(P,f)=>P*(1-c-f)-C;
+  const linha=m=>{const P=rP(C*(1+m/100)), j={};parc.forEach(([k])=>j[k]=rP(P/(1-taxa(k))));return {m,P,j,s:sob(P,0)}};
+  const L=ms.map(linha); if(pSel===null||!ms.includes(pSel)) pSel=CONFIG.precMargemMin;
+  const min=L[0], sel=L.find(x=>x.m===pSel);
+  $('pStatus').className='status s-ok';
+  $('pStatus').innerHTML=`<div class="lbl">${nome} · preço mínimo (${CONFIG.precMargemMin}%)</div><div class="big">${brl(min.P)}</div><div class="sub">Custo ${brl(C)} · à vista sobra <b>${brl(min.s)}</b> depois da comissão de ${pct(c*100)} (${pct(min.s/C*100)} sobre o custo).</div>`;
+  const fx=(k,t,v,s2)=>`<div class="fx ${k}"><span>${t}<small>${s2}</small></span><b>${v}</b></div>`;
+  let h=`<div class="hint" style="margin:0 0 2px"><b>Margem de ${sel.m}%</b> — como fica em cada pagamento</div>`;
+  h+=fx('ok','À vista',brl(sel.P),`sobra ${brl(sel.s)} · ${pct(sel.s/C*100)} sobre o custo`);
+  parc.forEach(([k,n])=>{const f=taxa(k),Pj=sel.j[k],sj=sob(Pj,f),ss=sob(sel.P,f);
+    h+=fx(ss>=0?'ok':'bad',`${n}x com juros (taxa ${pct(f*100)})`,brl(Pj),`${n}x de ${brl(Pj/n)} · sobra ${brl(sj)} · se vender ${n}x sem juros por ${brl(sel.P)}: sobra ${brl(ss)}`)});
+  $('pDet').innerHTML=h;
+  $('pTab').innerHTML=`<tr class="sec"><td>Margem</td><td>À vista</td><td>Sobra à vista</td><td>10x c/ juros</td><td>12x c/ juros</td><td>18x c/ juros</td></tr>`+
+    L.map(x=>`<tr data-m="${x.m}" style="cursor:pointer${x.m===pSel?';background:var(--card2)':''}"><td><b>${x.m}%</b>${x.m===CONFIG.precMargemMin?' · mínimo':''}</td><td><b>${brl(x.P)}</b></td><td class="pos">${brl(x.s)}</td><td>${brl(x.j.x10)}</td><td>${brl(x.j.x12)}</td><td>${brl(x.j.x18)}</td></tr>`).join('');
+  $('pTab').querySelectorAll('tr[data-m]').forEach(tr=>tr.onclick=()=>{pSel=+tr.dataset.m;pCalc()});
+  $('pTabHint').textContent=`Sobra = preço − comissão de ${pct(c*100)} − custo. No parcelado com juros a taxa da maquininha é repassada ao cliente, então a sobra fica quase igual à do à vista.`;
+}
+function initPrec(){$('pCom').value=CONFIG.precComissao;['pNome','pCusto','pCom'].forEach(i=>$(i).addEventListener('input',pCalc));pCalc()}
+function aba(x){if(x==='C'&&!diretoria)x='A';['A','B','C'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
 function sSeg(){
   const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
   $('sSeg').innerHTML=o.map(([v,t])=>`<button data-v="${v}" class="${v===sPag?'on':''}">${t}</button>`).join('');
@@ -428,7 +476,8 @@ function initSemi(){
   $('sModelo').onchange=sCalc; $('sCusto').addEventListener('input',sCalc); $('sPreco').addEventListener('input',sCalc);
   $('sBatN').onclick=()=>sSetBat(false); $('sBatS').onclick=()=>sSetBat(true);
   sSeg(); sCalc(); picker('sModelo'); picker('modeloU');
-  try{if(localStorage.getItem('ib_aba')==='B')aba('B')}catch(e){}
+  try{const t=localStorage.getItem('ib_aba');if(t==='B'||t==='C')aba(t)}catch(e){}
+  initPrec();
 }
 
 (async()=>{
