@@ -440,6 +440,13 @@ function picker(id){
 let VENDAS=null, vAcesso=null, vMes=null, vSel=null;
 const TIPO={P:'Produtos',C:'Celulares',A:'Assistência Técnica'}, NIV=[['Meta',1],['Super',1.1],['Mega',1.21],['Ultra',1.331],['Extrato',1.66375]];
 const r0=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+/* Bônus projetado (regras da planilha de comissionamento) */
+const BONUS={celular:0.0075, assistencia:0,
+  produtos:[['Abaixo da meta',0,0.02],['Meta',1,0.03],['Super',1.1,0.0325],['Mega',1.21,0.035],['Ultra',1.331,0.045],['Extrato',1.66375,0.055]],
+  participacao:{'Luan Morimoto':['Matriz',0.0075],'Pedro Henrique':['Catuaí',0.0075]}};
+const p2=v=>(v*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
+function bonusCalc(metaP,P,C,lojaProd,nome){let n=BONUS.produtos[0];BONUS.produtos.forEach(x=>{if(metaP&&P>=metaP*x[1]&&x[1]>0)n=x});
+  const pa=BONUS.participacao[nome], part=pa?lojaProd*pa[1]:0; return {nivel:n[0],taxa:n[2],prod:P*n[2],cel:C*BONUS.celular,part,tot:P*n[2]+C*BONUS.celular+part}}
 const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function diasVenda(loja,ym){const [y,m]=ym.split('-').map(Number),n=new Date(y,m,0).getDate(),fer=VENDAS.feriados||[],dom=(VENDAS.lojasDomingo||[]).includes(loja),o=[];
   for(let d=1;d<=n;d++){const dt=new Date(y,m-1,d),iso=`${ym}-${String(d).padStart(2,'0')}`;if(!dom&&(dt.getDay()===0||fer.includes(iso)))continue;o.push(d)}return o}
@@ -457,7 +464,7 @@ function vBase(ym){
 function vCalc(B,ent,filtro){
   const ym=B.ym,H=B.H,dias=diasVenda(ent.loja,ym),dt=dias.length,dv=dias.filter(d=>d<H).length,rest=dias.filter(d=>d>=H).length;
   const vs=B.V.filter(filtro), vend={P:0,C:0,A:0}; vs.forEach(x=>vend[x.t]+=x.x);
-  const soma=f=>vs.filter(f).reduce((a,x)=>a+x.x,0);
+  const soma=f=>vs.filter(f).reduce((a,x)=>a+x.x,0), ateT={P:soma(x=>x.t==='P'&&x.d<H),C:soma(x=>x.t==='C'&&x.d<H)};
   const metaT=ent.meta.P+ent.meta.C+ent.meta.A, vendT=vend.P+vend.C+vend.A, vendAte=soma(x=>x.d<H), hoje=soma(x=>x.d===H);
   const dS=Math.min(H,B.nd), dow=(new Date(+ym.slice(0,4),+ym.slice(5)-1,dS).getDay()+6)%7, ini=dS-dow, fim=ini+6;
   const wk=dias.filter(d=>d>=ini&&d<=fim).length, vendSem=soma(x=>x.d>=ini&&x.d<=fim), metaSem=dt?metaT/dt*wk:0;
@@ -468,7 +475,7 @@ function vCalc(B,ent,filtro){
   const cli=new Set(vs.filter(x=>x.t!=='A').map(x=>x.d+'|'+(x.n||Math.random()))).size, vPC=vend.P+vend.C, ticket=cli?vPC/cli:0;
   const lP=vs.filter(x=>x.t==='P'), lC=vs.filter(x=>x.t==='C'), tP=lP.length?vend.P/lP.length:0, tC=lC.length?vend.C/lC.length:0;
   const cum=[];let ac=0;for(let d=1;d<=dS;d++){ac+=vs.filter(x=>x.d===d).reduce((a,x)=>a+x.x,0);cum.push(ac)}
-  return {vend,vendT,vendAte,metaT,pct:metaT?vendT/metaT:0,proj,falta,metaDia,dv,dt,rest,wk,vendSem,metaSem,ini:Math.max(ini,1),fim:Math.min(fim,B.nd),hoje,ant,ritmo,cum,dias,metaHoje,ticket,tP,tC,cli,hojeVenda:dias.includes(H)};
+  return {ateT,vend,vendT,vendAte,metaT,pct:metaT?vendT/metaT:0,proj,falta,metaDia,dv,dt,rest,wk,vendSem,metaSem,ini:Math.max(ini,1),fim:Math.min(fim,B.nd),hoje,ant,ritmo,cum,dias,metaHoje,ticket,tP,tC,cli,hojeVenda:dias.includes(H)};
 }
 const cor=(pct,ritmo)=>pct>=ritmo-0.005?'var(--ok)':pct>=ritmo*0.85?'var(--warn)':'var(--bad)';
 function barra(pct,ritmo){return `<div class="barra"><span style="width:${Math.min(pct,1)*100}%;background:${cor(pct,ritmo)}"></span><em style="left:${Math.min(ritmo,1)*100}%" title="onde deveria estar hoje"></em></div>`}
@@ -554,6 +561,16 @@ function vRender(){
         <div class="sub">${frases[nx[0]]} ${na?`São cerca de <b>${na} ${na===1?'produto/acessório':'produtos/acessórios'}</b> no seu ticket médio de ${r0(c.tP)}.`:''} ${at?`Você já conquistou: <b>${at[0]}</b>.`:''}${c.rest?` Dá ${r0(fx/c.rest)} por dia nos ${c.rest} ${c.rest===1?'dia':'dias'} que restam.`:''}</div></div>`}
     else h+=`<div class="status s-ok" style="margin:6px 0 10px"><div class="lbl">Todos os níveis conquistados</div><div class="big">🏆 Extrato atingido!</div><div class="sub">Você chegou ao topo em Produtos. Lenda!</div></div>`;
     h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n} ${r0(P.meta.P*f)}</span>`).join('')}</div>`}
+  const podeBonus=['diretoria','gerente'].includes(vAcesso.perfil)||vAcesso.bonus==='todos'||vAcesso.vend===P.nome;
+  if(podeBonus){const pj=t=>B.fechado?c.vend[t]:(c.dv?c.ateT[t]/c.dv*c.dt:0), pa=BONUS.participacao[P.nome], lp=pa?vCalc(B,B.lojas[pa[0]],x=>x.l===pa[0]):null;
+    const lojaPj=lp?(B.fechado?lp.vend.P:(lp.dv?lp.ateT.P/lp.dv*lp.dt:0)):0;
+    const ja=bonusCalc(P.meta.P,c.vend.P,c.vend.C,lp?lp.vend.P:0,P.nome), pr=bonusCalc(P.meta.P,Math.max(pj('P'),c.vend.P),Math.max(pj('C'),c.vend.C),Math.max(lojaPj,lp?lp.vend.P:0),P.nome);
+    const cen=P.meta.P?BONUS.produtos.slice(1).map(([n,f])=>{const alvo=P.meta.P*f,b=bonusCalc(P.meta.P,Math.max(alvo,c.vend.P),Math.max(pj('C'),c.vend.C),Math.max(lojaPj,lp?lp.vend.P:0),P.nome);return {n,alvo,b,ok:c.vend.P>=alvo}}):[];
+    h+=`<div class="status" style="margin-top:14px;border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.06)"><div class="lbl" style="color:var(--ok)">💰 Bônus projetado</div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;margin:8px 0 6px"><div><div class="hint" style="margin:0">Já garantido com o que vendeu</div><div style="font-size:26px;font-weight:800">${r0(ja.tot)}</div><div class="hint" style="margin:0">nível ${ja.nivel} · produtos a ${p2(ja.taxa)}</div></div>
+      <div><div class="hint" style="margin:0">No ritmo atual, fecha o mês com</div><div style="font-size:26px;font-weight:800;color:var(--ok)">${r0(pr.tot)}</div><div class="hint" style="margin:0">nível ${pr.nivel} projetado</div></div></div>
+      ${cen.length?`<table style="margin-top:6px"><tr class="sec"><td style="text-align:left">Se bater</td><td>Produtos</td><td>Bônus</td><td>A mais</td></tr>${cen.map(x=>`<tr><td style="text-align:left">${x.ok?'✓ ':''}${x.n}</td><td>${r0(x.alvo)}</td><td><b>${r0(x.b.tot)}</b></td><td class="pos">${x.ok?'conquistado':'+'+r0(Math.max(x.b.tot-ja.tot,0))}</td></tr>`).join('')}</table>`:''}
+      <div class="hint">Composição: celulares ${p2(BONUS.celular)} · produtos/acessórios de 2% (abaixo da meta) até 5,5% (Extrato), conforme o nível batido${pa?` · participação ${p2(pa[1])} sobre os produtos da loja ${pa[0]} (hoje ${r0(ja.part)})`:''} · assistência técnica não entra. Valores estimados; o fechamento oficial é da diretoria.</div></div>`}
   h+=grafico(c,c.metaT,c.dt,c.dias);
   $('vDet').innerHTML=h;
 }
