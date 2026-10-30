@@ -495,8 +495,8 @@ function vRender(){
   if($('vMesSel'))$('vMesSel').onchange=e=>{vMes=e.target.value;vRender()};
   // lojas
   const lojaV=ehVend?(B.pessoas[vAcesso.vend]||{}).loja:null;
-  $('vLojasBox').querySelector('h2').textContent=ehVend?`Meta da sua loja · ${lojaV||''}`:'Lojas';
-  $('vLojas').innerHTML=(ehVend?[lojaV].filter(Boolean):['Matriz','Akash','Catuaí']).map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
+  $('vLojasBox').classList.toggle('hide',ehVend);
+  $('vLojas').innerHTML=['Matriz','Akash','Catuaí'].map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
     return `<div class="kpi" style="padding:14px"><div style="display:flex;justify-content:space-between"><b style="margin:0">${l}</b><b style="margin:0;color:${cor(c.pct,c.ritmo)}">${pct(c.pct*100)}</b></div>${barra(c.pct,c.ritmo)}
      <i>${r0(c.vendT)} de ${r0(c.metaT)} · projeção ${r0(c.proj)}</i><br><i>faltam ${r0(c.falta)} · <b style="display:inline;font-size:12px;color:var(--txt)">${r0(c.metaDia)}/dia</b> ${c.rest===1?'no último dia':'nos '+c.rest+' dias restantes (contando hoje)'}</i>
      <div style="margin-top:8px;font-size:12px;color:var(--mut)">${['P','C','A'].filter(t=>L.meta[t]||c.vend[t]).map(t=>`${TIPO[t]}: ${r0(c.vend[t])}${L.meta[t]?' / '+r0(L.meta[t])+' ('+pct(c.vend[t]/L.meta[t]*100)+')':''}`).join('<br>')}</div>
@@ -528,7 +528,11 @@ function vRender(){
   else{const fh=Math.max(c.metaHoje-c.hoje,0), ncl=c.ticket?Math.ceil(fh/c.ticket):0, nc=c.tC?Math.floor(fh/c.tC):0, np=c.tP?Math.ceil(Math.max(fh-nc*c.tC,0)/c.tP):0;
     const ex=[nc?`${nc} ${nc>1?'celulares':'celular'} (média ${r0(c.tC)})`:'',np?`${np} ${np>1?'acessórios/produtos':'acessório/produto'} (média ${r0(c.tP)})`:''].filter(Boolean).join(' + ');
     ins=`<div class="status ${st==='var(--warn)'?'s-warn':'s-bad'}" style="margin-bottom:12px"><div class="lbl">${st==='var(--warn)'?'Atenção: um pouco abaixo do ritmo':'Abaixo do ritmo da meta'}</div><div class="big">${B.fechado?'Mês encerrado':fh>0?`Faltam ${r0(fh)} hoje`:'Meta de hoje batida 👏'}</div><div class="sub">${fh>0?`Para bater a meta de hoje (${r0(c.metaHoje)}): cerca de <b>${ncl} ${ncl===1?'cliente':'clientes'}</b> no seu ticket médio de ${r0(c.ticket)}${ex?` — por exemplo ${ex}`:''}.`:''} No mês faltam ${r0(c.falta)}${c.rest>1?`: ${r0(c.metaDia)} por dia nos ${c.rest} dias de venda que restam (contando hoje)`:c.rest===1?' e hoje é o último dia de venda':''}.</div></div>`}
-  let h=ins+`<div class="kpis">`+
+  const LJ=B.lojas[P.loja], cl=LJ?vCalc(B,LJ,x=>x.l===P.loja):null;
+  const lojaBox=cl?`<div class="kpi" style="padding:14px;margin-bottom:12px;border:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:center"><small style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">Meta da loja ${P.loja}</small><b style="margin:0;color:${cor(cl.pct,cl.ritmo)}">${pct(cl.pct*100)}</b></div>${barra(cl.pct,cl.ritmo)}
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:6px"><span>Meta <b style="display:inline;font-size:13px">${r0(cl.metaT)}</b></span><span>Vendido <b style="display:inline;font-size:13px">${r0(cl.vendT)}</b></span><span>Falta <b style="display:inline;font-size:13px;color:${cl.falta?'var(--warn)':'var(--ok)'}">${cl.falta?r0(cl.falta):'meta batida 🎉'}</b></span>${cl.falta&&cl.rest?`<span>Por dia <b style="display:inline;font-size:13px">${r0(cl.metaDia)}</b> nos ${cl.rest} ${cl.rest===1?'dia':'dias'} que restam</span>`:''}</div>
+    <i>Sua parte: ${cl.vendT?pct(c.vendT/cl.vendT*100):'—'} do que a loja vendeu no mês · projeção da loja ${r0(cl.proj)}</i></div>`:'';
+  let h=ins+lojaBox+`<div class="kpis">`+
     K(`Meta de hoje (dia ${Math.min(B.H,B.nd)})`,B.fechado?'—':r0(c.metaHoje),`vendido hoje ${r0(c.hoje)} · <b style="display:inline;font-size:12px;color:${cor(c.metaHoje?c.hoje/c.metaHoje:1,1)}">${pc(c.hoje,c.metaHoje)}</b>`)+
     K(`Meta da semana (${c.ini}–${c.fim}/${m})`,r0(c.metaSem),`vendido ${r0(c.vendSem)} · <b style="display:inline;font-size:12px;color:${cor(c.metaSem?c.vendSem/c.metaSem:0,c.ritmoSem??1)}">${pc(c.vendSem,c.metaSem)}</b>`)+
     K(`Meta do mês`,r0(c.metaT),`vendido ${r0(c.vendT)} · <b style="display:inline;font-size:12px;color:${st}">${pct(c.pct*100)}</b> (ideal hoje: ${pct(c.ritmo*100)})`)+
