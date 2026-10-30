@@ -64,6 +64,18 @@
   .tabs{max-width:980px;margin:0 auto;padding:4px 16px 8px;display:flex;gap:6px;flex-wrap:wrap}
   .tabs button{background:var(--card2);border:1px solid var(--line);color:var(--mut);padding:10px 14px;border-radius:999px;font:inherit;font-weight:600;cursor:pointer}
   .tabs button.on{background:#fff;color:#000;border-color:#fff}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .kpi{background:var(--card2);border-radius:12px;padding:12px}
+  .kpi small{display:block;color:var(--mut);font-size:12px} .kpi b{display:block;font-size:19px;margin-top:3px} .kpi i{font-style:normal;font-size:12px;color:var(--mut)}
+  .barra{height:10px;background:var(--card2);border-radius:99px;overflow:hidden;position:relative;margin:6px 0 2px}
+  .barra>span{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+  .barra>em{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;opacity:.7}
+  .lojas{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .podio{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end}
+  .podio div{background:var(--card2);border-radius:14px;padding:14px 10px;text-align:center;border-top:4px solid}
+  .podio .p1{border-color:#facc15;padding-top:24px} .podio .p2{border-color:#cbd5e1} .podio .p3{border-color:#d97706}
+  .podio b{display:block;font-size:22px} .podio span{font-size:13.5px} .podio small{display:block;color:var(--mut);font-size:12px}
+  .nivs{display:flex;gap:6px;flex-wrap:wrap} .nivs span{font-size:12px;padding:5px 9px;border-radius:99px;background:var(--card2);color:var(--mut)} .nivs span.ok{background:rgba(34,197,94,.18);color:var(--ok)}
   .pick{width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
   .pick.vazio{color:var(--mut)}
   .lista{margin-top:6px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:420px;overflow-y:auto}
@@ -80,7 +92,8 @@
    CONFIGURAÇÃO — só a diretoria mexe aqui
    ===================================================================== */
 const CONFIG = {
-  dados: "dados.json",                      // arquivo criptografado gerado a partir do Notion
+  dados: "dados.json",
+  vendas: "vendas.json",                    // relatório de vendas (criptografado, chave própria)                      // arquivo criptografado gerado a partir do Notion
   taxas: { avista: 0, x10: 10, x12: 12, x18: 15 },   // % da maquininha sobre o valor passado no cartão
   comissao: 0.5,                             // % sobre o preço de venda
   margemMinima: 15,
@@ -106,7 +119,7 @@ let EXEMPLO = [];
   <div class="brand">IBLACK<small>Aprovação de venda e desconto</small></div>
   <div style="display:flex;align-items:center;gap:10px"><span id="quem" style="color:var(--mut);font-size:13px"></span><button class="btn ghost hide" id="btnSair" onclick="sair()">Sair</button></div>
 </header>
-<nav class="tabs"><button id="tabA" class="on" onclick="aba('A')">Venda de novo · troca</button><button id="tabB" onclick="aba('B')">Venda de seminovo</button><button id="tabC" class="hide" onclick="aba('C')">Precificação</button></nav>
+<nav class="tabs"><button id="tabA" class="on" onclick="aba('A')">Venda de novo · troca</button><button id="tabB" onclick="aba('B')">Venda de seminovo</button><button id="tabC" class="hide" onclick="aba('C')">Precificação</button><button id="tabD" class="hide" onclick="aba('D')">Vendas</button></nav>
 <div class="banner hide" id="banner"><div id="bannerTxt"></div></div>
 
 <main id="abaA">
@@ -206,6 +219,13 @@ let EXEMPLO = [];
     <div class="hint" id="pTabHint"></div>
   </section>
 </main>
+<main id="abaD" class="hide">
+  <section class="card full"><div id="vTopo"></div></section>
+  <section class="card full" id="vLojasBox"><h2>Lojas</h2><div class="lojas" id="vLojas"></div></section>
+  <section class="card"><h2>Pódio do mês</h2><div class="podio" id="vPodio"></div><div class="hint">Ranking por % da meta do mês (produtos + celulares + assistência).</div></section>
+  <section class="card"><h2>Ranking</h2><div style="overflow-x:auto"><table id="vRank"></table></div></section>
+  <section class="card full"><h2 id="vNomeT">Vendedor</h2><div id="vEscolha"></div><div id="vDet"></div></section>
+</main>
 <p class="foot" id="foot"></p>
 <div class="lock hide" id="lock"><form id="lockForm"><h3>IBLACK</h3><p>Entre com seu usuário e senha.</p>
 <input id="lockUser" autocomplete="username" autocapitalize="none" placeholder="Usuário" style="margin-bottom:8px">
@@ -248,7 +268,9 @@ async function entrar(blob,usuario,senha){
   const ku=await chave(usuario+'\n'+senha,b64(u.salt),blob.iter);
   const acesso=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(u.iv)},ku,b64(u.ct))));
   const kd=await crypto.subtle.importKey('raw',b64(acesso.k),'AES-GCM',false,['decrypt']);
-  const dados=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(blob.iv)},kd,b64(blob.ct))));
+  let bruto=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(blob.iv)},kd,b64(blob.ct));
+  if(blob.z) bruto=await new Response(new Blob([bruto]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  const dados=JSON.parse(dec.decode(bruto));
   return {acesso,dados};
 }
 function pedirLogin(erro){
@@ -263,10 +285,17 @@ async function carregar(){
   let blob;
   try{const r=await fetch(CONFIG.dados+'?t='+Date.now());if(!r.ok)throw 0;blob=await r.json()}
   catch(e){aviso('Não consegui carregar a tabela de aparelhos. Avise a diretoria.');return}
+  let vblob=null;try{const r=await fetch(CONFIG.vendas+'?t='+Date.now());if(r.ok)vblob=await r.json()}catch(e){}
   let salvo=null;try{salvo=JSON.parse(localStorage.getItem('ib_login')||'null')}catch(e){}
   for(let tent=0;tent<20;tent++){
     let cred=salvo; salvo=null;
     if(!cred) cred=await pedirLogin(tent?'Usuário ou senha incorretos.':'');
+    let v=null; if(vblob){try{v=await entrar(vblob,cred[0],cred[1])}catch(e){}}
+    if(v){VENDAS=v.dados;vAcesso=v.acesso;$('tabD').classList.remove('hide')}
+    if(v&&v.acesso.perfil==='vendedor'){
+      try{localStorage.setItem('ib_login',JSON.stringify(cred))}catch(e){}
+      sessao=v.acesso;$('quem').textContent=v.acesso.nome;$('btnSair').classList.remove('hide');
+      ['tabA','tabB','tabC'].forEach(t=>$(t).classList.add('hide'));aba('D');return}
     try{const {acesso,dados}=await entrar(blob,cred[0],cred[1]);
       try{localStorage.setItem('ib_login',JSON.stringify(cred))}catch(e){}
       sessao=acesso;EXEMPLO=dados.novos;USADOS=dados.usados;lista=EXEMPLO.slice();
@@ -406,6 +435,95 @@ function picker(id){
   btn.onclick=()=>{box.classList.toggle('hide');draw()};
   draw(); sel._draw=draw;
 }
+/* ---------- aba: relatório de vendas ---------- */
+let VENDAS=null, vAcesso=null, vMes=null, vSel=null;
+const TIPO={P:'Produtos',C:'Celulares',A:'Assistência Técnica'}, NIV=[['Meta',1],['Super',1.1],['Mega',1.21],['Ultra',1.331],['Extrato',1.66375]];
+const r0=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function diasVenda(loja,ym){const [y,m]=ym.split('-').map(Number),n=new Date(y,m,0).getDate(),fer=VENDAS.feriados||[],dom=(VENDAS.lojasDomingo||[]).includes(loja),o=[];
+  for(let d=1;d<=n;d++){const dt=new Date(y,m-1,d),iso=`${ym}-${String(d).padStart(2,'0')}`;if(!dom&&(dt.getDay()===0||fer.includes(iso)))continue;o.push(d)}return o}
+function mesAnt(ym){let [y,m]=ym.split('-').map(Number);m--;if(!m){m=12;y--}return `${y}-${String(m).padStart(2,'0')}`}
+function vBase(ym){
+  const M=VENDAS.meses[ym], V=M.vendas.map(([d,l,t,v,x])=>({d:+d,l,t,v,x})), dRef=Math.max(...V.map(x=>x.d),1);
+  const pessoas={};
+  M.metas.forEach(([v,l,t,m])=>{const p=pessoas[v]=pessoas[v]||{nome:v,loja:l,meta:{P:0,C:0,A:0}};p.meta[{'Produtos':'P','Celulares':'C','Assistência Técnica':'A'}[t]]+=m});
+  const lojas={};['Matriz','Akash','Catuaí'].forEach(l=>lojas[l]={nome:l,loja:l,meta:{P:0,C:0,A:0}});
+  Object.values(pessoas).forEach(p=>{if(lojas[p.loja])['P','C','A'].forEach(t=>lojas[p.loja].meta[t]+=p.meta[t])});
+  return {M,V,dRef,pessoas,lojas,ym};
+}
+function vCalc(B,ent,filtro){
+  const ym=B.ym,dias=diasVenda(ent.loja,ym),dv=dias.filter(d=>d<=B.dRef).length,dt=dias.length,rest=dt-dv;
+  const vs=B.V.filter(filtro), vend={P:0,C:0,A:0}; vs.forEach(x=>vend[x.t]+=x.x);
+  const metaT=ent.meta.P+ent.meta.C+ent.meta.A, vendT=vend.P+vend.C+vend.A;
+  const dRefDate=new Date(+ym.slice(0,4),+ym.slice(5)-1,B.dRef), dow=(dRefDate.getDay()+6)%7, ini=B.dRef-dow, fim=ini+6;
+  const wk=dias.filter(d=>d>=ini&&d<=fim).length, vendSem=vs.filter(x=>x.d>=ini&&x.d<=fim).reduce((a,x)=>a+x.x,0), metaSem=dt?metaT/dt*wk:0;
+  const hoje=vs.filter(x=>x.d===B.dRef).reduce((a,x)=>a+x.x,0);
+  const proj=dv?vendT/dv*dt:0, falta=Math.max(metaT-vendT,0), metaDia=rest?falta/rest:0, ritmo=dt?dv/dt:1;
+  let ant=null; const pm=mesAnt(ym);
+  if(VENDAS.meses[pm]){const P=VENDAS.meses[pm].vendas.map(([d,l,t,v,x])=>({d:+d,l,t,v,x}));const f2=ent===B.lojas[ent.nome]?(x=>x.l===ent.nome):(x=>x.v===ent.nome);
+    const a=P.filter(f2);ant={ate:a.filter(x=>x.d<=B.dRef).reduce((s,x)=>s+x.x,0),dia:a.filter(x=>x.d===B.dRef).reduce((s,x)=>s+x.x,0),tot:a.reduce((s,x)=>s+x.x,0)}}
+  const cum=[];let ac=0;for(let d=1;d<=B.dRef;d++){ac+=vs.filter(x=>x.d===d).reduce((a,x)=>a+x.x,0);cum.push(ac)}
+  return {vend,vendT,metaT,pct:metaT?vendT/metaT:0,proj,falta,metaDia,dv,dt,rest,wk,vendSem,metaSem,ini:Math.max(ini,1),fim:Math.min(fim,new Date(+ym.slice(0,4),+ym.slice(5),0).getDate()),hoje,ant,ritmo,cum,dias};
+}
+const cor=(pct,ritmo)=>pct>=ritmo-0.005?'var(--ok)':pct>=ritmo*0.85?'var(--warn)':'var(--bad)';
+function barra(pct,ritmo){return `<div class="barra"><span style="width:${Math.min(pct,1)*100}%;background:${cor(pct,ritmo)}"></span><em style="left:${Math.min(ritmo,1)*100}%" title="onde deveria estar hoje"></em></div>`}
+function grafico(c,meta,dt,dias){
+  const W=640,H=180,n=dias.length,dmax=dias[n-1]||30,xs=d=>14+(W-28)*(d-1)/(dmax-1||1),top=Math.max(meta,c.proj,...c.cum,1)*1.08,ys=v=>H-18-(H-36)*v/top;
+  let pm='',ac=0;dias.forEach((d,i)=>{pm+=`${i?'L':'M'}${xs(d).toFixed(1)},${ys(meta*(i+1)/n).toFixed(1)}`});
+  const pr=c.cum.map((v,i)=>`${i?'L':'M'}${xs(i+1).toFixed(1)},${ys(v).toFixed(1)}`).join('');
+  const last=c.cum.length, pj=`M${xs(last).toFixed(1)},${ys(c.cum[last-1]||0).toFixed(1)}L${xs(dmax).toFixed(1)},${ys(c.proj).toFixed(1)}`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:8px">
+    <line x1="14" x2="${W-14}" y1="${ys(meta)}" y2="${ys(meta)}" stroke="#444" stroke-dasharray="3 4"/><text x="${W-14}" y="${ys(meta)-5}" fill="#9a9aa2" font-size="11" text-anchor="end">meta ${r0(meta)}</text>
+    <path d="${pm}" fill="none" stroke="#666" stroke-width="1.5"/>
+    <path d="${pj}" fill="none" stroke="${cor(c.proj/(meta||1),1)}" stroke-width="2" stroke-dasharray="5 5"/>
+    <path d="${pr}" fill="none" stroke="#fff" stroke-width="2.5"/>
+    <text x="14" y="${H-3}" fill="#9a9aa2" font-size="11">dia 1</text><text x="${W-14}" y="${H-3}" fill="#9a9aa2" font-size="11" text-anchor="end">dia ${dmax}</text></svg>
+    <div class="hint">Linha branca: vendido acumulado · cinza: ritmo da meta · tracejada: projeção até o fim do mês.</div>`;
+}
+function vRender(){
+  if(!VENDAS)return; const meses=Object.keys(VENDAS.meses).sort(); if(!vMes||!VENDAS.meses[vMes])vMes=meses[meses.length-1];
+  const B=vBase(vMes), ehVend=vAcesso.perfil==='vendedor', [y,m]=vMes.split('-');
+  const ppl=Object.values(B.pessoas).filter(p=>!p.nome.startsWith('Loja ')&&(p.meta.P+p.meta.C+p.meta.A)>0);
+  const calc={};ppl.forEach(p=>calc[p.nome]=vCalc(B,p,x=>x.v===p.nome));
+  const rank=ppl.slice().sort((a,b)=>calc[b.nome].pct-calc[a.nome].pct);
+  const dM=diasVenda('Matriz',vMes),dC=diasVenda('Catuaí',vMes),ref={dv:dM.filter(d=>d<=B.dRef).length,dt:dM.length,rest:dM.filter(d=>d>B.dRef).length,cv:dC.filter(d=>d<=B.dRef).length,ct:dC.length};
+  $('vTopo').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><div style="font-size:20px;font-weight:800;text-transform:capitalize">${MESES[+m-1]} ${y}</div><div class="hint" style="margin:2px 0 0">Vendas lançadas até o dia ${B.dRef}/${m} · Matriz e Akash: ${ref.dv} de ${ref.dt} dias de venda · Catuaí (abre domingos e feriados): ${ref.cv} de ${ref.ct}</div></div>${meses.length>1?`<select id="vMesSel" style="width:auto">${meses.map(k=>`<option value="${k}" ${k===vMes?'selected':''}>${MESES[+k.slice(5)-1]} ${k.slice(0,4)}</option>`).join('')}</select>`:''}</div>`;
+  if($('vMesSel'))$('vMesSel').onchange=e=>{vMes=e.target.value;vRender()};
+  // lojas
+  $('vLojasBox').classList.toggle('hide',ehVend);
+  if(!ehVend)$('vLojas').innerHTML=['Matriz','Akash','Catuaí'].map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
+    return `<div class="kpi" style="padding:14px"><div style="display:flex;justify-content:space-between"><b style="margin:0">${l}</b><b style="margin:0;color:${cor(c.pct,c.ritmo)}">${pct(c.pct*100)}</b></div>${barra(c.pct,c.ritmo)}
+     <i>${r0(c.vendT)} de ${r0(c.metaT)} · projeção ${r0(c.proj)}</i><br><i>faltam ${r0(c.falta)} · <b style="display:inline;font-size:12px;color:var(--txt)">${r0(c.metaDia)}/dia</b> ${c.rest===1?'no último dia':'nos '+c.rest+' dias restantes'}</i>
+     <div style="margin-top:8px;font-size:12px;color:var(--mut)">${['P','C','A'].filter(t=>L.meta[t]||c.vend[t]).map(t=>`${TIPO[t]}: ${r0(c.vend[t])}${L.meta[t]?' / '+r0(L.meta[t])+' ('+pct(c.vend[t]/L.meta[t]*100)+')':''}`).join('<br>')}</div>
+     ${c.ant?`<div style="margin-top:6px;font-size:12px;color:var(--mut)">Mês passado até o dia ${B.dRef}: ${r0(c.ant.ate)} (${c.ant.ate?((c.vendT/c.ant.ate-1)*100>=0?'+':'')+pct((c.vendT/c.ant.ate-1)*100):'—'})</div>`:''}</div>`}).join('');
+  // pódio e ranking
+  const med=['p1','p2','p3'], ord=[1,0,2];
+  $('vPodio').innerHTML=ord.map(i=>rank[i]?`<div class="${med[i]}"><small>${i+1}º</small><b>${pct(calc[rank[i].nome].pct*100)}</b><span>${rank[i].nome}</span><small>${rank[i].loja}</small></div>`:'<div></div>').join('');
+  const verRS=!ehVend;
+  $('vRank').innerHTML=`<tr class="sec"><td>#</td><td style="text-align:left">Vendedor</td><td>% meta</td>${verRS?'<td>Vendido</td><td>Projeção</td>':''}</tr>`+rank.map((p,i)=>{const c=calc[p.nome],eu=ehVend&&p.nome===vAcesso.vend;
+    return `<tr data-v="${p.nome}" style="cursor:${ehVend?'default':'pointer'}${eu||p.nome===vSel?';background:var(--card2)':''}"><td>${i+1}º</td><td style="text-align:left;white-space:normal">${p.nome}<small style="display:block;color:var(--mut)">${p.loja}</small></td><td style="color:${cor(c.pct,c.ritmo)}"><b>${pct(c.pct*100)}</b></td>${verRS?`<td>${r0(c.vendT)}</td><td>${r0(c.proj)}</td>`:''}</tr>`}).join('');
+  if(!ehVend)$('vRank').querySelectorAll('tr[data-v]').forEach(tr=>tr.onclick=()=>{vSel=tr.dataset.v;vRender();$('vNomeT').scrollIntoView({behavior:'smooth'})});
+  // detalhe
+  if(ehVend)vSel=vAcesso.vend; else if(!vSel||!calc[vSel])vSel=rank[0]?.nome;
+  $('vEscolha').innerHTML=ehVend?'':`<div class="nivs" style="margin-bottom:12px">${rank.map(p=>`<span style="cursor:pointer" class="${p.nome===vSel?'ok':''}" data-v="${p.nome}">${p.nome.split(' ')[0]}</span>`).join('')}</div>`;
+  $('vEscolha').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{vSel=b.dataset.v;vRender()});
+  const P=B.pessoas[vSel], c=calc[vSel];
+  if(!P||!c){$('vNomeT').textContent='Vendedor';$('vDet').innerHTML='<div class="hint">Sem meta cadastrada neste mês.</div>';return}
+  const pos=rank.findIndex(p=>p.nome===vSel)+1;
+  $('vNomeT').textContent=`${P.nome} · ${P.loja} · ${pos}º no ranking`;
+  const K=(t,v,s2,cl)=>`<div class="kpi"><small>${t}</small><b ${cl?`style="color:${cl}"`:''}>${v}</b>${s2?`<i>${s2}</i>`:''}</div>`;
+  let h=`<div class="kpis">`+K('Vendido no mês',r0(c.vendT),`meta ${r0(c.metaT)}`)+K('% da meta',pct(c.pct*100),`hoje deveria estar em ${pct(c.ritmo*100)}`,cor(c.pct,c.ritmo))+
+    K('Projeção do mês',r0(c.proj),c.metaT?pct(c.proj/c.metaT*100)+' da meta':'',cor(c.proj/(c.metaT||1),1))+K('Falta para a meta',r0(c.falta),c.falta?`${c.rest} ${c.rest===1?'dia':'dias'} de venda ${c.rest===1?'restante':'restantes'}`:'meta batida! 🎉')+
+    K('Meta por dia',c.rest?r0(c.metaDia):'—',c.rest?'para bater a meta':'mês encerrado')+
+    K(`Semana (${c.ini}–${c.fim}/${m})`,r0(c.vendSem),`meta da semana ${r0(c.metaSem)} · ${c.metaSem?pct(c.vendSem/c.metaSem*100):'—'}`,cor(c.metaSem?c.vendSem/c.metaSem:0,1))+
+    K(`Dia ${B.dRef}`,r0(c.hoje),c.ant?`mês passado no dia ${B.dRef}: ${r0(c.ant.dia)}`:'sem dados do mês anterior');
+  if(c.ant)h+=K(`Até o dia ${B.dRef} · mês passado`,r0(c.ant.ate),c.ant.ate?`${c.vendT>=c.ant.ate?'+':''}${pct((c.vendT/c.ant.ate-1)*100)} este mês`:'',c.vendT>=c.ant.ate?'var(--ok)':'var(--bad)');
+  h+=`</div>`;
+  h+=`<div style="margin-top:14px">${['P','C','A'].filter(t=>P.meta[t]||c.vend[t]).map(t=>{const mt=P.meta[t],pc=mt?c.vend[t]/mt:0;return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${TIPO[t]}</span><span>${r0(c.vend[t])}${mt?' / '+r0(mt)+' · <b>'+pct(pc*100)+'</b>':''}</span></div>${mt?barra(pc,c.ritmo):''}</div>`}).join('')}</div>`;
+  if(P.meta.P){const v=c.vend.P;h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n} ${r0(P.meta.P*f)}</span>`).join('')}</div>`}
+  h+=grafico(c,c.metaT,c.dt,c.dias);
+  $('vDet').innerHTML=h;
+}
 /* ---------- aba: precificação (só diretoria) ---------- */
 let pSel=null;
 const rP=v=>v<1000?Math.ceil((v+0.1)/10)*10-0.1:Math.ceil((v+1)/100)*100-1;   // 130 → 139,90 · 2.139 → 2.199
@@ -448,7 +566,7 @@ function initPrec(){$('pCom').value=CONFIG.precComissao;['pNome','pCusto','pCom'
   $('pCusto').addEventListener('input',()=>{if(!$('cCusto').dataset.mexeu)$('cCusto').value=$('pCusto').value;cCalc()});
   $('cCusto').addEventListener('input',()=>{$('cCusto').dataset.mexeu=1;cCalc()}); $('cPreco').addEventListener('input',cCalc);
   cSeg();pCalc();cCalc()}
-function aba(x){if(x==='C'&&!diretoria)x='A';['A','B','C'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
+function aba(x){if(x==='C'&&!diretoria)x='A';if(x==='D'&&!VENDAS)x='A';if(x==='D')vRender();['A','B','C','D'].forEach(k=>{$('aba'+k).classList.toggle('hide',k!==x);$('tab'+k).classList.toggle('on',k===x)});try{localStorage.setItem('ib_aba',x)}catch(e){}}
 function sSeg(){
   const o=[['avista','À vista'],['x12','12x'],['x18','18x']];
   $('sSeg').innerHTML=o.map(([v,t])=>`<button data-v="${v}" class="${v===sPag?'on':''}">${t}</button>`).join('');
@@ -503,7 +621,7 @@ function initSemi(){
   $('sModelo').onchange=sCalc; $('sCusto').addEventListener('input',sCalc); $('sPreco').addEventListener('input',sCalc);
   $('sBatN').onclick=()=>sSetBat(false); $('sBatS').onclick=()=>sSetBat(true);
   sSeg(); sCalc(); picker('sModelo'); picker('modeloU');
-  try{const t=localStorage.getItem('ib_aba');if(t==='B'||t==='C')aba(t)}catch(e){}
+  try{const t=localStorage.getItem('ib_aba');if(t==='B'||t==='C'||t==='D')aba(t)}catch(e){}
   initPrec();
 }
 
