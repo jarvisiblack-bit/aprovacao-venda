@@ -494,8 +494,9 @@ function vRender(){
   $('vTopo').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><div style="font-size:20px;font-weight:800;text-transform:capitalize">${MESES[+m-1]} ${y}</div><div class="hint" style="margin:2px 0 0">${B.fechado?'Mês encerrado':`Hoje: dia ${B.H}/${m}`} · vendas lançadas até o dia ${B.dRef}/${m} · dias de venda concluídos: Matriz e Akash ${ref.dv} de ${ref.dt} · Catuaí ${ref.cv} de ${ref.ct} (abre domingos e feriados)</div></div>${meses.length>1?`<select id="vMesSel" style="width:auto">${meses.map(k=>`<option value="${k}" ${k===vMes?'selected':''}>${MESES[+k.slice(5)-1]} ${k.slice(0,4)}</option>`).join('')}</select>`:''}</div>`;
   if($('vMesSel'))$('vMesSel').onchange=e=>{vMes=e.target.value;vRender()};
   // lojas
-  $('vLojasBox').classList.toggle('hide',ehVend);
-  if(!ehVend)$('vLojas').innerHTML=['Matriz','Akash','Catuaí'].map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
+  const lojaV=ehVend?(B.pessoas[vAcesso.vend]||{}).loja:null;
+  $('vLojasBox').querySelector('h2').textContent=ehVend?`Meta da sua loja · ${lojaV||''}`:'Lojas';
+  $('vLojas').innerHTML=(ehVend?[lojaV].filter(Boolean):['Matriz','Akash','Catuaí']).map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
     return `<div class="kpi" style="padding:14px"><div style="display:flex;justify-content:space-between"><b style="margin:0">${l}</b><b style="margin:0;color:${cor(c.pct,c.ritmo)}">${pct(c.pct*100)}</b></div>${barra(c.pct,c.ritmo)}
      <i>${r0(c.vendT)} de ${r0(c.metaT)} · projeção ${r0(c.proj)}</i><br><i>faltam ${r0(c.falta)} · <b style="display:inline;font-size:12px;color:var(--txt)">${r0(c.metaDia)}/dia</b> ${c.rest===1?'no último dia':'nos '+c.rest+' dias restantes (contando hoje)'}</i>
      <div style="margin-top:8px;font-size:12px;color:var(--mut)">${['P','C','A'].filter(t=>L.meta[t]||c.vend[t]).map(t=>`${TIPO[t]}: ${r0(c.vend[t])}${L.meta[t]?' / '+r0(L.meta[t])+' ('+pct(c.vend[t]/L.meta[t]*100)+')':''}`).join('<br>')}</div>
@@ -539,7 +540,14 @@ function vRender(){
   h+=comp;
   h+=`</div>`;
   h+=`<div style="margin-top:14px">${['P','C','A'].filter(t=>P.meta[t]||c.vend[t]).map(t=>{const mt=P.meta[t],pc=mt?c.vend[t]/mt:0;return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${TIPO[t]}</span><span>${r0(c.vend[t])}${mt?' / '+r0(mt)+' · <b>'+pct(pc*100)+'</b>':''}</span></div>${mt?barra(pc,c.ritmo):''}</div>`}).join('')}</div>`;
-  if(P.meta.P){const v=c.vend.P;h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n} ${r0(P.meta.P*f)}</span>`).join('')}</div>`}
+  if(P.meta.P){const v=c.vend.P, nx=NIV.find(([n,f])=>v<P.meta.P*f), at=NIV.filter(([n,f])=>v>=P.meta.P*f).pop();
+    const frases={Meta:'Bora bater a meta! Cada venda conta. 💪',Super:'A Meta já é sua — agora é Super! 🚀',Mega:'Você está voando! Mega está logo ali. 🔥',Ultra:'Nível de elite! Falta pouco para o Ultra. ⚡',Extrato:'Poucos chegam aqui. Vá buscar o Extrato! 🏆'};
+    if(nx){const alvo=P.meta.P*nx[1], fx=alvo-v, base=at?P.meta.P*at[1]:0, pr=(v-base)/(alvo-base||1), na=c.tP?Math.ceil(fx/c.tP):0;
+      h+=`<div class="status" style="margin:6px 0 10px;border-color:rgba(250,204,21,.45);background:rgba(250,204,21,.07)"><div class="lbl" style="color:#facc15">Próximo nível em Produtos: ${nx[0]}</div><div class="big" style="color:#facc15">Faltam ${r0(fx)}</div>
+        <div class="barra"><span style="width:${Math.min(pr,1)*100}%;background:#facc15"></span></div>
+        <div class="sub">${frases[nx[0]]} ${na?`São cerca de <b>${na} ${na===1?'produto/acessório':'produtos/acessórios'}</b> no seu ticket médio de ${r0(c.tP)}.`:''} ${at?`Você já conquistou: <b>${at[0]}</b>.`:''}${c.rest?` Dá ${r0(fx/c.rest)} por dia nos ${c.rest} ${c.rest===1?'dia':'dias'} que restam.`:''}</div></div>`}
+    else h+=`<div class="status s-ok" style="margin:6px 0 10px"><div class="lbl">Todos os níveis conquistados</div><div class="big">🏆 Extrato atingido!</div><div class="sub">Você chegou ao topo em Produtos. Lenda!</div></div>`;
+    h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n} ${r0(P.meta.P*f)}</span>`).join('')}</div>`}
   h+=grafico(c,c.metaT,c.dt,c.dias);
   $('vDet').innerHTML=h;
 }
