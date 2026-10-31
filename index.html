@@ -471,7 +471,7 @@ function vCalc(B,ent,filtro){
   const proj=B.fechado?vendT:(dv?vendAte/dv*dt:0), falta=Math.max(metaT-vendT,0), metaHoje=rest?Math.max(metaT-vendAte,0)/rest:0, metaDia=metaHoje, ritmo=dt?dv/dt:1;
   let ant=null; const pm=mesAnt(ym);
   if(VENDAS.meses[pm]){const P=VENDAS.meses[pm].vendas.map(([d,l,t,v,x,n])=>({d:+d,l,t,v,x,n}));const f2=ent===B.lojas[ent.nome]?(x=>x.l===ent.nome):(x=>x.v===ent.nome);
-    const a=P.filter(f2);ant={ate:a.filter(x=>x.d<H).reduce((s,x)=>s+x.x,0),dia:a.filter(x=>x.d===H).reduce((s,x)=>s+x.x,0),tot:a.reduce((s,x)=>s+x.x,0)}}
+    const a=P.filter(f2);ant={ate:a.filter(x=>x.d<H).reduce((s,x)=>s+x.x,0),dia:a.filter(x=>x.d===H).reduce((s,x)=>s+x.x,0),tot:a.reduce((s,x)=>s+x.x,0),nd:new Date(+pm.slice(0,4),+pm.slice(5),0).getDate()}}
   const cli=new Set(vs.filter(x=>x.t!=='A').map(x=>x.d+'|'+(x.n||Math.random()))).size, vPC=vend.P+vend.C, ticket=cli?vPC/cli:0;
   const lP=vs.filter(x=>x.t==='P'), lC=vs.filter(x=>x.t==='C'), tP=lP.length?vend.P/lP.length:0, tC=lC.length?vend.C/lC.length:0;
   const cum=[];let ac=0;for(let d=1;d<=dS;d++){ac+=vs.filter(x=>x.d===d).reduce((a,x)=>a+x.x,0);cum.push(ac)}
@@ -548,7 +548,7 @@ function vRender(){
     K('Projeção do mês',r0(c.proj),c.metaT?pct(c.proj/c.metaT*100)+' da meta':'',cor(c.proj/(c.metaT||1),1))+
     K('Falta para a meta',r0(c.falta),c.falta?`${c.rest} ${c.rest===1?'dia':'dias'} de venda ${c.rest===1?'restante':'restantes'}`:'meta batida! 🎉')+
     K('Ticket médio por cliente',r0(c.ticket),`${c.cli} clientes no mês`);
-  const comp=c.ant?`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b>${r0(c.hoje)} <span style="font-size:13px;color:var(--mut);font-weight:500">hoje × ${r0(c.ant.dia)} no dia ${B.H} do mês passado</span></b><i>Acumulado até ontem (dia ${B.H-1}): ${r0(c.vendAte)} × ${r0(c.ant.ate)} no mês passado (${c.ant.ate?`<b style="display:inline;font-size:12px;color:${c.vendAte>=c.ant.ate?'var(--ok)':'var(--bad)'}">${c.vendAte>=c.ant.ate?'+':''}${pct((c.vendAte/c.ant.ate-1)*100)}</b>`:'—'})</i></div>`
+  const comp=c.ant?`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b>${r0(c.hoje)} <span style="font-size:13px;color:var(--mut);font-weight:500">hoje × ${B.H>c.ant.nd?`(o mês passado não teve dia ${B.H})`:`${r0(c.ant.dia)} no dia ${B.H} do mês passado`}</span></b><i>Acumulado até ontem (dia ${B.H-1}): ${r0(c.vendAte)} × ${r0(c.ant.ate)} no mês passado (${c.ant.ate?`<b style="display:inline;font-size:12px;color:${c.vendAte>=c.ant.ate?'var(--ok)':'var(--bad)'}">${c.vendAte>=c.ant.ate?'+':''}${pct((c.vendAte/c.ant.ate-1)*100)}</b>`:'—'})</i></div>`
     :`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b style="font-size:15px;color:var(--warn)">Sem histórico do mês anterior</b><i>A comparação aparece quando o mês passado estiver carregado.</i></div>`;
   h+=comp;
   h+=`</div>`;
