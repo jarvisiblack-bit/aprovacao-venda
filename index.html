@@ -492,6 +492,17 @@ function grafico(c,meta,dt,dias){
     <text x="14" y="${H-3}" fill="#9a9aa2" font-size="11">dia 1</text><text x="${W-14}" y="${H-3}" fill="#9a9aa2" font-size="11" text-anchor="end">dia ${dmax}</text></svg>
     <div class="hint">Linha branca: vendido acumulado · cinza: ritmo da meta · tracejada: projeção até o fim do mês.</div>`;
 }
+function cbCalc(){const k=window._cb;if(!k||!$('cbAlvo'))return;const alvo=num('cbAlvo'),mix=num('cbMix')/100;
+  $('cbMixL').textContent=`${Math.round(mix*100)}% produtos / ${Math.round((1-mix)*100)}% celulares`;
+  const bon=S=>bonusCalc(k.metaP,S*mix,S*(1-mix),k.lojaProd,k.nome);
+  if(!alvo){$('cbRes').innerHTML='';return}
+  let lo=0,hi=1e7;if(bon(hi).tot<alvo){$('cbRes').innerHTML='<div class="hint">Valor muito alto para esse mix.</div>';return}
+  for(let i=0;i<70;i++){const m=(lo+hi)/2;if(bon(m).tot>=alvo)hi=m;else lo=m}
+  const S=hi,b=bon(S),P=S*mix,C=S*(1-mix),fP=Math.max(P-k.vP,0),fC=Math.max(C-k.vC,0),falta=fP+fC;
+  const cli=k.ticket?Math.ceil(falta/k.ticket):0;
+  $('cbRes').innerHTML=`<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:4px"><div><div class="hint" style="margin:0">Para ganhar ${r0(alvo)} precisa vender no mês</div><div style="font-size:26px;font-weight:800;color:#60a5fa">${r0(S)}</div><div class="hint" style="margin:0">${r0(P)} em produtos + ${r0(C)} em celulares · nível ${b.nivel}</div></div>
+    <div><div class="hint" style="margin:0">Falta vender a partir de hoje</div><div style="font-size:26px;font-weight:800">${falta?r0(falta):'nada! ✅'}</div><div class="hint" style="margin:0">${falta?`${r0(fP)} produtos + ${r0(fC)} celulares${k.rest>1?` · ${r0(falta/k.rest)} por dia nos ${k.rest} dias que restam`:k.rest===1?' · hoje é o último dia do mês':''}${cli?` · ≈ ${cli} clientes no seu ticket`:''}`:'você já vendeu o suficiente para esse bônus'}</div></div></div>
+    <div class="hint">Mude o mix para ver como fica vendendo mais produtos (bônus maior por real vendido) ou mais celulares. Hoje você já tem garantido ${r0(k.ja)}.</div>`}
 function lojaCard(B,loja,c,borda){const LJ=B.lojas[loja], cl=LJ?vCalc(B,LJ,x=>x.l===loja):null;
   return cl?`<div class="kpi" style="padding:14px;${borda?'margin-bottom:12px;border:1px solid var(--line)':''}"><div style="display:flex;justify-content:space-between;align-items:center"><small style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">Meta da loja ${loja}</small><b style="margin:0;color:${cor(cl.pct,cl.ritmo)}">${pct(cl.pct*100)}</b></div>${barra(cl.pct,cl.ritmo)}
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:6px"><span>Meta <b style="display:inline;font-size:13px">${r0(cl.metaT)}</b></span><span>Vendido <b style="display:inline;font-size:13px">${r0(cl.vendT)}</b></span><span>Falta <b style="display:inline;font-size:13px;color:${cl.falta?'var(--warn)':'var(--ok)'}">${cl.falta?r0(cl.falta):'meta batida 🎉'}</b></span>${cl.falta&&cl.rest?`<span>Por dia <b style="display:inline;font-size:13px">${r0(cl.metaDia)}</b> nos ${cl.rest} ${cl.rest===1?'dia':'dias'} que restam</span>`:''}</div>
@@ -570,9 +581,18 @@ function vRender(){
       <div style="display:flex;gap:22px;flex-wrap:wrap;margin:8px 0 6px"><div><div class="hint" style="margin:0">Já garantido com o que vendeu</div><div style="font-size:26px;font-weight:800">${r0(ja.tot)}</div><div class="hint" style="margin:0">nível ${ja.nivel} · produtos a ${p2(ja.taxa)}</div></div>
       <div><div class="hint" style="margin:0">No ritmo atual, fecha o mês com</div><div style="font-size:26px;font-weight:800;color:var(--ok)">${r0(pr.tot)}</div><div class="hint" style="margin:0">nível ${pr.nivel} projetado</div></div></div>
       ${cen.length?`<table style="margin-top:6px"><tr class="sec"><td style="text-align:left">Se bater</td><td>Produtos</td><td>Bônus</td><td>A mais</td></tr>${cen.map(x=>`<tr><td style="text-align:left">${x.ok?'✓ ':''}${x.n}</td><td>${r0(x.alvo)}</td><td><b>${r0(x.b.tot)}</b></td><td class="pos">${x.ok?'conquistado':'+'+r0(Math.max(x.b.tot-ja.tot,0))}</td></tr>`).join('')}</table>`:''}
-      <div class="hint">Composição: celulares ${p2(BONUS.celular)} · produtos/acessórios de 2% (abaixo da meta) até 5,5% (Extrato), conforme o nível batido${pa?` · participação ${p2(pa[1])} sobre os produtos da loja ${pa[0]} (hoje ${r0(ja.part)})`:''} · assistência técnica não entra. Valores estimados; o fechamento oficial é da diretoria.</div></div>`}
+      <div class="hint">Composição: celulares ${p2(BONUS.celular)} · produtos/acessórios de 2% (abaixo da meta) até 5,5% (Extrato), conforme o nível batido${pa?` · participação ${p2(pa[1])} sobre os produtos da loja ${pa[0]} (hoje ${r0(ja.part)})`:''} · assistência técnica não entra. Valores estimados; o fechamento oficial é da diretoria.</div></div>`;
+    const mix0=(c.vend.P+c.vend.C)?Math.round(c.vend.P/(c.vend.P+c.vend.C)*100):50;
+    window._cb={metaP:P.meta.P,vP:c.vend.P,vC:c.vend.C,nome:P.nome,lojaProd:Math.max(lojaPj,lp?lp.vend.P:0),rest:c.rest,ticket:c.ticket,tP:c.tP,tC:c.tC,ja:ja.tot};
+    h+=`<div class="status" style="margin-top:12px;border-color:rgba(96,165,250,.45);background:rgba(96,165,250,.06)"><div class="lbl" style="color:#60a5fa">🎯 Calculadora de bônus</div>
+      <div class="sub" style="margin:4px 0 10px">Quanto você quer ganhar de bônus no mês?</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${[2000,3000,4000,5000,6000].map(v=>`<button type="button" class="btn ghost" data-cb="${v}" style="padding:7px 12px">${r0(v)}</button>`).join('')}</div>
+      <div class="row"><div class="field"><label>Bônus desejado (R$)</label><input type="number" id="cbAlvo" inputmode="decimal" value="${Math.max(Math.ceil(ja.tot/500)*500+500,2000)}"></div>
+      <div class="field"><label>Mix: <span id="cbMixL">${mix0}% produtos / ${100-mix0}% celulares</span></label><input type="range" id="cbMix" min="0" max="100" step="5" value="${Math.round(mix0/5)*5}" style="padding:0;height:36px"></div></div>
+      <div id="cbRes"></div></div>`}
   h+=grafico(c,c.metaT,c.dt,c.dias);
   $('vDet').innerHTML=h;
+  if($('cbAlvo')){$('cbAlvo').oninput=cbCalc;$('cbMix').oninput=cbCalc;$('vDet').querySelectorAll('[data-cb]').forEach(b=>b.onclick=()=>{$('cbAlvo').value=b.dataset.cb;cbCalc()});cbCalc()}
 }
 /* ---------- aba: precificação (só diretoria) ---------- */
 let pSel=null;
