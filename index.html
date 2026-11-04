@@ -34,6 +34,10 @@
   .yn button.on{background:#fff;color:#000;border-color:#fff}
   .troca{border-top:1px dashed var(--line);padding-top:12px}
   .hide{display:none!important}
+  .ws-trk{height:10px;background:var(--card2);border-radius:99px;overflow:hidden;flex:1}.ws-trk i{display:block;height:100%;border-radius:99px}
+  .ws-k{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.ws-k div{background:var(--card2);border-radius:12px;padding:10px}.ws-k small{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}.ws-k b{font-size:16px}
+  .ws-sems{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:6px}.ws-sem{background:var(--card2);border-radius:12px;padding:8px 6px;text-align:center;border:2px solid transparent}.ws-sem b{display:block;font-size:15px;margin:3px 0}.ws-sem small{color:var(--mut);font-size:10.5px}
+  .ws-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:10px}.ws-leg span:before{content:'';display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;background:var(--c)}
   .status{border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid var(--line)}
   .status .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--mut)}
   .status .big{font-size:28px;font-weight:800;margin:6px 0 4px;line-height:1.15}
@@ -507,6 +511,51 @@ function lojaCard(B,loja,c,borda){const LJ=B.lojas[loja], cl=LJ?vCalc(B,LJ,x=>x.
   return cl?`<div class="kpi" style="padding:14px;${borda?'margin-bottom:12px;border:1px solid var(--line)':''}"><div style="display:flex;justify-content:space-between;align-items:center"><small style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">Meta da loja ${loja}</small><b style="margin:0;color:${cor(cl.pct,cl.ritmo)}">${pct(cl.pct*100)}</b></div>${barra(cl.pct,cl.ritmo)}
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:6px"><span>Meta <b style="display:inline;font-size:13px">${r0(cl.metaT)}</b></span><span>Vendido <b style="display:inline;font-size:13px">${r0(cl.vendT)}</b></span><span>Falta <b style="display:inline;font-size:13px;color:${cl.falta?'var(--warn)':'var(--ok)'}">${cl.falta?r0(cl.falta):'meta batida 🎉'}</b></span>${cl.falta&&cl.rest?`<span>Por dia <b style="display:inline;font-size:13px">${r0(cl.metaDia)}</b> nos ${cl.rest} ${cl.rest===1?'dia':'dias'} que restam</span>`:''}</div>
     <i>Sua parte: ${cl.vendT?pct(c.vendT/cl.vendT*100):'—'} do que a loja vendeu no mês · projeção da loja ${r0(cl.proj)}</i></div>`:'';}
+/* ---------- visão semanal do vendedor ---------- */
+function semanal(B,P,c,ehVend){
+  const [Y,Mo]=B.ym.split('-').map(Number), H=B.H, dias=c.dias, metaDia=c.dt?c.metaT/c.dt:0, nm=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const dw=d=>new Date(Y,Mo-1,d).getDay(), vdia=d=>B.V.filter(x=>x.v===P.nome&&x.d===d).reduce((a,x)=>a+x.x,0);
+  const vdT=(d,t)=>B.V.filter(x=>x.v===P.nome&&x.d===d&&x.t===t).reduce((a,x)=>a+x.x,0);
+  let sems=[],cur=null;for(let d=1;d<=B.nd;d++){if(!cur||dw(d)===1){cur={dias:[]};sems.push(cur)}cur.dias.push(d)}
+  for(let i=0;i<sems.length;i++){if(sems[i].dias.filter(d=>dias.includes(d)).length<3&&sems.length>1){const alvo=sems[i+1]||sems[i-1];if(i+1<sems.length)alvo.dias.unshift(...sems[i].dias);else alvo.dias.push(...sems[i].dias);sems.splice(i,1);i--}}
+  sems.forEach((s,i)=>{s.n=i+1;s.ab=s.dias.filter(d=>dias.includes(d));s.meta=metaDia*s.ab.length;s.ini=s.dias[0];s.fim=s.dias[s.dias.length-1];
+    s.ai=s.ab[0]||s.ini;s.af=s.ab[s.ab.length-1]||s.fim;s.vend=s.dias.reduce((a,d)=>a+vdia(d),0);
+    s.st=B.fechado||s.fim<H?'pass':s.ini>H?'fut':'atual';
+    const feitos=s.ab.filter(d=>d<H).length;s.esp=s.st==='pass'?1:s.st==='fut'?0:(s.ab.length?feitos/s.ab.length:1);s.q=s.meta?s.vend/s.meta:0});
+  const S=sems.find(s=>s.st==='atual')||sems[sems.length-1], cS=S.st==='atual'?cor(S.q,Math.max(S.esp,0.0001)):cor(S.q,1);
+  const resta=S.st==='atual'?S.ab.filter(d=>d>=H).length:0, falta=Math.max(S.meta-S.vend,0), mm=MESES[Mo-1].slice(0,3);
+  const sel=S.q>=1?'SEMANA BATIDA':S.st!=='atual'?'ENCERRADA':S.q>=S.esp-0.005?'NO RITMO':S.q>=S.esp*0.85?'ATENÇÃO':'ABAIXO';
+  const msg=S.q>=1?'Semana batida! Agora é bônus 🚀':S.st!=='atual'?'Semana encerrada.':S.q>=S.esp-0.005?'Você está no ritmo — segue assim! 💪':S.q>=S.esp*0.85?'Quase no ritmo — um bom dia hoje te coloca no verde.':'Atenção: hoje precisa acelerar para recuperar a semana.';
+  const pr=v=>Math.round(v*100)+'%';
+  let tk=c.ticket; if(c.cli<10&&VENDAS.meses[mesAnt(B.ym)]){const a=VENDAS.meses[mesAnt(B.ym)].vendas.filter(x=>x[3]===P.nome&&x[2]!=='A'),n=new Set(a.map(x=>x[0]+'|'+x[5])).size;if(n>=10)tk=a.reduce((s,x)=>s+x[4],0)/n}
+  const donut=(q,cl)=>{const R=52,L=2*Math.PI*R,f=Math.min(q,1)*L;return `<svg width="132" height="132" viewBox="0 0 120 120" style="flex:none"><circle cx="60" cy="60" r="${R}" fill="none" stroke="#26262b" stroke-width="13"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="${cl}" stroke-width="13" stroke-linecap="round" stroke-dasharray="${f} ${L}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" fill="#f4f4f5" font-size="24" font-weight="800">${pr(q)}</text><text x="60" y="77" text-anchor="middle" fill="#9a9aa2" font-size="10">da semana</text></svg>`};
+  const tipos=['C','P','A'].filter(t=>P.meta[t]), ic={C:'📱 Celulares',P:'🎧 Produtos',A:'🔧 Assistência'};
+  const barT=t=>{const m=P.meta[t]/(c.dt||1)*S.ab.length,v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=S.st==='atual'?cor(q,Math.max(S.esp,0.0001)):cor(q,1);
+    return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${ic[t]}</span><span><b style="color:${cl}">${r0(v)}</b> <span style="color:var(--mut)">de ${r0(m)}</span></span></div><div class="ws-trk" style="display:block"><i style="width:${Math.min(q,1)*100}%;background:${cl}"></i></div></div>`};
+  const estrelas=sems.filter(s=>s.st!=='fut'&&s.meta&&s.vend>=s.meta).length;
+  // topo: só o % do mês
+  let h=`<div class="status" style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px"><span class="lbl" style="white-space:nowrap">Meta do mês</span><div class="ws-trk"><i style="width:${Math.min(c.pct,1)*100}%;background:${cor(c.pct,c.ritmo)}"></i></div><b style="font-size:18px;color:${cor(c.pct,c.ritmo)}">${pr(c.pct)}</b>${estrelas?`<span title="semanas batidas">${'⭐'.repeat(estrelas)}</span>`:''}</div></div>`;
+  // destaque: semana
+  h+=`<div class="status" style="border:2px solid ${cS}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div class="lbl" style="color:${cS}">🎯 Meta da semana ${S.n} · ${S.ai} a ${S.af}/${mm}</div><span style="padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:color-mix(in srgb,${cS} 18%,transparent);color:${cS};white-space:nowrap">${sel}</span></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px">${donut(S.q,cS)}<div style="flex:1;min-width:180px"><div class="sub">${S.st==='atual'?'Falta pra bater a semana':'Resultado da semana'}</div><div style="font-size:34px;font-weight:800;line-height:1.05;color:${cS}">${falta?r0(falta):'Batida ✅'}</div><div class="sub" style="margin-top:6px">Vendeu ${r0(S.vend)} de ${r0(S.meta)}</div><div style="margin-top:8px;font-size:13.5px">${msg}</div></div></div>
+    ${S.st==='atual'?`<div class="ws-k"><div><small>Dias de venda</small><b>${resta} ${resta===1?'dia':'dias'}</b></div><div><small>Por dia</small><b>${resta&&falta?r0(falta/resta):'—'}</b></div><div><small>Clientes</small><b>${tk&&resta&&falta?'≈ '+Math.ceil(falta/resta/tk)+'/dia':'—'}</b></div></div>`:''}
+    ${tipos.map(barT).join('')}</div>`;
+  // gráfico dos dias
+  const dd=S.ab, W=520, Hh=180, bw=W/(dd.length||1), mx=Math.max(metaDia*1.5,...dd.map(vdia),1), y=v=>Hh-24-v/mx*(Hh-44);
+  let g=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" style="display:block">`;
+  dd.forEach((d,i)=>{const fut=!B.fechado&&d>H, v=vdia(d), x=i*bw+bw*.18, w=bw*.64, hoje=!B.fechado&&d===H;
+    const cl=fut?'#3f3f46':hoje&&v<metaDia?'#60a5fa':cor(metaDia?v/metaDia:1,1), top=fut?y(metaDia):y(v);
+    g+=`<rect x="${x}" y="${top}" width="${w}" height="${Math.max(Hh-24-top,2)}" rx="6" fill="${cl}" ${fut?'fill-opacity=".35" stroke="#52525b" stroke-dasharray="4 3"':''}/>`;
+    g+=`<text x="${x+w/2}" y="${top-6}" text-anchor="middle" fill="#d4d4d8" font-size="11">${fut?'':(v?(Math.round(v/100)/10).toLocaleString('pt-BR')+'k':'0')}${hoje?' · hoje':''}</text>`;
+    g+=`<text x="${x+w/2}" y="${Hh-7}" text-anchor="middle" fill="${hoje?'#f4f4f5':'#9a9aa2'}" font-size="11.5" font-weight="${hoje?800:500}">${nm[dw(d)]} ${d}</text>`});
+  g+=`<line x1="0" x2="${W}" y1="${y(metaDia)}" y2="${y(metaDia)}" stroke="#f4f4f5" stroke-opacity=".55" stroke-dasharray="5 4"/><text x="${W-4}" y="${y(metaDia)-5}" text-anchor="end" fill="#a1a1aa" font-size="10.5">meta/dia ${r0(metaDia)}</text></svg>`;
+  h+=`<div class="status"><div class="lbl">Seus dias nesta semana</div><div class="sub" style="margin:4px 0 8px;font-size:13px">Barra = quanto vendeu · linha tracejada = meta do dia${B.fechado?'':' · azul = hoje (em andamento)'}</div>${g}</div>`;
+  // cartões das semanas
+  h+=`<div class="status"><div class="lbl" style="margin-bottom:10px">Suas semanas no mês</div><div class="ws-sems">${sems.map(s=>{const cl=s.st==='fut'?'#3f3f46':s.st==='atual'?cor(s.q,Math.max(s.esp,0.0001)):cor(s.q,1);
+    return `<div class="ws-sem" style="${s===S?'border-color:'+cl:''}"><small>Sem ${s.n}</small><b style="color:${s.st==='fut'?'#71717a':cl}">${s.st==='fut'?'—':pr(s.q)}</b><div class="ws-trk" style="display:block;height:6px"><i style="width:${s.st==='fut'?0:Math.min(s.q,1)*100}%;background:${cl}"></i></div><small>${s.ai}–${s.af}/${String(Mo).padStart(2,'0')}${s.st==='pass'&&s.q>=1?' ✅':s.st==='atual'?' · agora':''}</small></div>`}).join('')}</div>
+    <div class="ws-leg"><span style="--c:var(--ok)">bateu / no ritmo</span><span style="--c:var(--warn)">perto</span><span style="--c:var(--bad)">abaixo</span><span style="--c:#3f3f46">ainda não começou</span></div></div>`;
+  return h;
+}
 function vRender(){
   if(!VENDAS)return; const meses=Object.keys(VENDAS.meses).sort(); if(!vMes||!VENDAS.meses[vMes])vMes=meses[meses.length-1];
   const B=vBase(vMes), ehVend=vAcesso.perfil==='vendedor', [y,m]=vMes.split('-');
@@ -552,18 +601,20 @@ function vRender(){
     const ex=[nc?`${nc} ${nc>1?'celulares':'celular'} (média ${r0(c.tC)})`:'',np?`${np} ${np>1?'acessórios/produtos':'acessório/produto'} (média ${r0(c.tP)})`:''].filter(Boolean).join(' + ');
     ins=`<div class="status ${st==='var(--warn)'?'s-warn':'s-bad'}" style="margin-bottom:12px"><div class="lbl">${st==='var(--warn)'?'Atenção: um pouco abaixo do ritmo':'Abaixo do ritmo da meta'}</div><div class="big">${B.fechado?'Mês encerrado':fh>0?`Faltam ${r0(fh)} hoje`:'Meta de hoje batida 👏'}</div><div class="sub">${fh>0?`Para bater a meta de hoje (${r0(c.metaHoje)}): cerca de <b>${ncl} ${ncl===1?'cliente':'clientes'}</b> no seu ticket médio de ${r0(c.ticket)}${ex?` — por exemplo ${ex}`:''}.`:''} No mês faltam ${r0(c.falta)}${c.rest>1?`: ${r0(c.metaDia)} por dia nos ${c.rest} dias de venda que restam (contando hoje)`:c.rest===1?' e hoje é o último dia de venda':''}.</div></div>`}
   const lojaBox=ehVend?'':lojaCard(B,P.loja,c,true);
-  let h=ins+lojaBox+`<div class="kpis">`+
+  let h=semanal(B,P,c,ehVend);
+  if(!ehVend){h+=ins+lojaBox+`<div class="kpis">`+
     K(`Meta de hoje (dia ${Math.min(B.H,B.nd)})`,B.fechado?'—':r0(c.metaHoje),`vendido hoje ${r0(c.hoje)} · <b style="display:inline;font-size:12px;color:${cor(c.metaHoje?c.hoje/c.metaHoje:1,1)}">${pc(c.hoje,c.metaHoje)}</b>`)+
     K(`Meta da semana (${c.ini}–${c.fim}/${m})`,r0(c.metaSem),`vendido ${r0(c.vendSem)} · <b style="display:inline;font-size:12px;color:${cor(c.metaSem?c.vendSem/c.metaSem:0,c.ritmoSem??1)}">${pc(c.vendSem,c.metaSem)}</b>`)+
     K(`Meta do mês`,r0(c.metaT),`vendido ${r0(c.vendT)} · <b style="display:inline;font-size:12px;color:${st}">${pct(c.pct*100)}</b> (ideal hoje: ${pct(c.ritmo*100)})`)+
     K('Projeção do mês',r0(c.proj),c.metaT?pct(c.proj/c.metaT*100)+' da meta':'',cor(c.proj/(c.metaT||1),1))+
     K('Falta para a meta',r0(c.falta),c.falta?`${c.rest} ${c.rest===1?'dia':'dias'} de venda ${c.rest===1?'restante':'restantes'}`:'meta batida! 🎉')+
-    K('Ticket médio por cliente',r0(c.ticket),`${c.cli} clientes no mês`);
+    K('Ticket médio por cliente',r0(c.ticket),`${c.cli} clientes no mês`);}
+  else h+=`<div class="kpis">`;
   const comp=c.ant?`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b>${r0(c.hoje)} <span style="font-size:13px;color:var(--mut);font-weight:500">hoje × ${B.H>c.ant.nd?`(o mês passado não teve dia ${B.H})`:`${r0(c.ant.dia)} no dia ${B.H} do mês passado`}</span></b><i>Acumulado até ontem (dia ${B.H-1}): ${r0(c.vendAte)} × ${r0(c.ant.ate)} no mês passado (${c.ant.ate?`<b style="display:inline;font-size:12px;color:${c.vendAte>=c.ant.ate?'var(--ok)':'var(--bad)'}">${c.vendAte>=c.ant.ate?'+':''}${pct((c.vendAte/c.ant.ate-1)*100)}</b>`:'—'})</i></div>`
     :`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b style="font-size:15px;color:var(--warn)">Sem histórico do mês anterior</b><i>A comparação aparece quando o mês passado estiver carregado.</i></div>`;
   h+=comp;
   h+=`</div>`;
-  h+=`<div style="margin-top:14px">${['P','C','A'].filter(t=>P.meta[t]||c.vend[t]).map(t=>{const mt=P.meta[t],pc=mt?c.vend[t]/mt:0;return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${TIPO[t]}</span><span>${r0(c.vend[t])}${mt?' / '+r0(mt)+' · <b>'+pct(pc*100)+'</b>':''}</span></div>${mt?barra(pc,c.ritmo):''}</div>`}).join('')}</div>`;
+  if(!ehVend)h+=`<div style="margin-top:14px">${['P','C','A'].filter(t=>P.meta[t]||c.vend[t]).map(t=>{const mt=P.meta[t],pc=mt?c.vend[t]/mt:0;return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${TIPO[t]}</span><span>${r0(c.vend[t])}${mt?' / '+r0(mt)+' · <b>'+pct(pc*100)+'</b>':''}</span></div>${mt?barra(pc,c.ritmo):''}</div>`}).join('')}</div>`;
   if(P.meta.P){const v=c.vend.P, nx=NIV.find(([n,f])=>v<P.meta.P*f), at=NIV.filter(([n,f])=>v>=P.meta.P*f).pop();
     const frases={Meta:'Bora bater a meta! Cada venda conta. 💪',Super:'A Meta já é sua — agora é Super! 🚀',Mega:'Você está voando! Mega está logo ali. 🔥',Ultra:'Nível de elite! Falta pouco para o Ultra. ⚡',Extrato:'Poucos chegam aqui. Vá buscar o Extrato! 🏆'};
     if(nx){const alvo=P.meta.P*nx[1], fx=alvo-v, base=at?P.meta.P*at[1]:0, pr=(v-base)/(alvo-base||1), na=c.tP?Math.ceil(fx/c.tP):0;
@@ -571,7 +622,7 @@ function vRender(){
         <div class="barra"><span style="width:${Math.min(pr,1)*100}%;background:#facc15"></span></div>
         <div class="sub">${frases[nx[0]]} ${na?`São cerca de <b>${na} ${na===1?'produto/acessório':'produtos/acessórios'}</b> no seu ticket médio de ${r0(c.tP)}.`:''} ${at?`Você já conquistou: <b>${at[0]}</b>.`:''}${c.rest?` Dá ${r0(fx/c.rest)} por dia nos ${c.rest} ${c.rest===1?'dia':'dias'} que restam.`:''}</div></div>`}
     else h+=`<div class="status s-ok" style="margin:6px 0 10px"><div class="lbl">Todos os níveis conquistados</div><div class="big">🏆 Extrato atingido!</div><div class="sub">Você chegou ao topo em Produtos. Lenda!</div></div>`;
-    h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n} ${r0(P.meta.P*f)}</span>`).join('')}</div>`}
+    h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n}${ehVend?'':' '+r0(P.meta.P*f)}</span>`).join('')}</div>`}
   const podeBonus=['diretoria','gerente'].includes(vAcesso.perfil)||vAcesso.bonus==='todos'||vAcesso.vend===P.nome;
   if(podeBonus){const pj=t=>B.fechado?c.vend[t]:(c.dv?c.ateT[t]/c.dv*c.dt:0), pa=BONUS.participacao[P.nome], lps=pa?pa[0].filter(l=>B.lojas[l]).map(l=>vCalc(B,B.lojas[l],x=>x.l===l)):[], lp=lps.length?{vend:{P:lps.reduce((s,q)=>s+q.vend.P,0)}}:null;
     const lojaPj=lps.reduce((s,q)=>s+(B.fechado?q.vend.P:(q.dv?q.ateT.P/q.dv*q.dt:0)),0);
@@ -590,7 +641,7 @@ function vRender(){
       <div class="row"><div class="field"><label>Bônus desejado (R$)</label><input type="number" id="cbAlvo" inputmode="decimal" value="${Math.max(Math.ceil(ja.tot/500)*500+500,2000)}"></div>
       <div class="field"><label>Mix: <span id="cbMixL">${mix0}% produtos / ${100-mix0}% celulares</span></label><input type="range" id="cbMix" min="0" max="100" step="5" value="${Math.round(mix0/5)*5}" style="padding:0;height:36px"></div></div>
       <div id="cbRes"></div></div>`}
-  h+=grafico(c,c.metaT,c.dt,c.dias);
+  if(!ehVend)h+=grafico(c,c.metaT,c.dt,c.dias);
   $('vDet').innerHTML=h;
   if($('cbAlvo')){$('cbAlvo').oninput=cbCalc;$('cbMix').oninput=cbCalc;$('vDet').querySelectorAll('[data-cb]').forEach(b=>b.onclick=()=>{$('cbAlvo').value=b.dataset.cb;cbCalc()});cbCalc()}
 }
