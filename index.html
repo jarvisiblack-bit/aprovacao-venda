@@ -442,7 +442,7 @@ function picker(id){
 }
 /* ---------- aba: relatório de vendas ---------- */
 let VENDAS=null, vAcesso=null, vMes=null, vSel=null;
-const TIPO={P:'Produtos',C:'Celulares',A:'Assistência Técnica'}, NIV=[['Meta',1],['Super',1.1],['Mega',1.21],['Ultra',1.331],['Extrato',1.66375]];
+const TIPO={P:'Produtos',C:'Celulares',A:'Assistência Técnica (fora da meta de vendas)'}, NIV=[['Meta',1],['Super',1.1],['Mega',1.21],['Ultra',1.331],['Extrato',1.66375]];
 const r0=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
 /* Bônus projetado (regras da planilha de comissionamento) */
 const BONUS={celular:0.0075, assistencia:0,
@@ -467,15 +467,15 @@ function vBase(ym){
 }
 function vCalc(B,ent,filtro){
   const ym=B.ym,H=B.H,dias=diasVenda(ent.loja,ym),dt=dias.length,dv=dias.filter(d=>d<H).length,rest=dias.filter(d=>d>=H).length;
-  const vs=B.V.filter(filtro), vend={P:0,C:0,A:0}; vs.forEach(x=>vend[x.t]+=x.x);
+  const vsA=B.V.filter(filtro), vend={P:0,C:0,A:0}; vsA.forEach(x=>vend[x.t]+=x.x); const vs=vsA.filter(x=>x.t!=='A');
   const soma=f=>vs.filter(f).reduce((a,x)=>a+x.x,0), ateT={P:soma(x=>x.t==='P'&&x.d<H),C:soma(x=>x.t==='C'&&x.d<H)};
-  const metaT=ent.meta.P+ent.meta.C+ent.meta.A, vendT=vend.P+vend.C+vend.A, vendAte=soma(x=>x.d<H), hoje=soma(x=>x.d===H);
+  const metaT=ent.meta.P+ent.meta.C, vendT=vend.P+vend.C, vendAte=soma(x=>x.d<H), hoje=soma(x=>x.d===H);
   const dS=Math.min(H,B.nd), dow=(new Date(+ym.slice(0,4),+ym.slice(5)-1,dS).getDay()+6)%7, ini=dS-dow, fim=ini+6;
   const wk=dias.filter(d=>d>=ini&&d<=fim).length, vendSem=soma(x=>x.d>=ini&&x.d<=fim), metaSem=dt?metaT/dt*wk:0;
   const proj=B.fechado?vendT:(dv?vendAte/dv*dt:0), falta=Math.max(metaT-vendT,0), metaHoje=rest?Math.max(metaT-vendAte,0)/rest:0, metaDia=metaHoje, ritmo=dt?dv/dt:1;
   let ant=null; const pm=mesAnt(ym);
   if(VENDAS.meses[pm]){const P=VENDAS.meses[pm].vendas.map(([d,l,t,v,x,n])=>({d:+d,l,t,v,x,n}));const f2=ent===B.lojas[ent.nome]?(x=>x.l===ent.nome):(x=>x.v===ent.nome);
-    const a=P.filter(f2);ant={ate:a.filter(x=>x.d<H).reduce((s,x)=>s+x.x,0),dia:a.filter(x=>x.d===H).reduce((s,x)=>s+x.x,0),tot:a.reduce((s,x)=>s+x.x,0),nd:new Date(+pm.slice(0,4),+pm.slice(5),0).getDate()}}
+    const a=P.filter(f2).filter(x=>x.t!=='A');ant={ate:a.filter(x=>x.d<H).reduce((s,x)=>s+x.x,0),dia:a.filter(x=>x.d===H).reduce((s,x)=>s+x.x,0),tot:a.reduce((s,x)=>s+x.x,0),nd:new Date(+pm.slice(0,4),+pm.slice(5),0).getDate()}}
   const cli=new Set(vs.filter(x=>x.t!=='A').map(x=>x.d+'|'+(x.n||Math.random()))).size, vPC=vend.P+vend.C, ticket=cli?vPC/cli:0;
   const lP=vs.filter(x=>x.t==='P'), lC=vs.filter(x=>x.t==='C'), tP=lP.length?vend.P/lP.length:0, tC=lC.length?vend.C/lC.length:0;
   const cum=[];let ac=0;for(let d=1;d<=dS;d++){ac+=vs.filter(x=>x.d===d).reduce((a,x)=>a+x.x,0);cum.push(ac)}
@@ -518,7 +518,7 @@ function lojaCard(B,loja,c,borda,soPct){const LJ=B.lojas[loja], cl=LJ?vCalc(B,LJ
 /* ---------- visão semanal do vendedor ---------- */
 function semanal(B,P,c,ehVend){
   const [Y,Mo]=B.ym.split('-').map(Number), H=B.H, dias=c.dias, metaDia=c.dt?c.metaT/c.dt:0, nm=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  const dw=d=>new Date(Y,Mo-1,d).getDay(), vdia=d=>B.V.filter(x=>x.v===P.nome&&x.d===d).reduce((a,x)=>a+x.x,0);
+  const dw=d=>new Date(Y,Mo-1,d).getDay(), vdia=d=>B.V.filter(x=>x.v===P.nome&&x.d===d&&x.t!=='A').reduce((a,x)=>a+x.x,0);
   const vdT=(d,t)=>B.V.filter(x=>x.v===P.nome&&x.d===d&&x.t===t).reduce((a,x)=>a+x.x,0);
   let sems=[],cur=null;for(let d=1;d<=B.nd;d++){if(!cur||dw(d)===1){cur={dias:[]};sems.push(cur)}cur.dias.push(d)}
   for(let i=0;i<sems.length;i++){if(sems[i].dias.filter(d=>dias.includes(d)).length<3&&sems.length>1){const alvo=sems[i+1]||sems[i-1];if(i+1<sems.length)alvo.dias.unshift(...sems[i].dias);else alvo.dias.push(...sems[i].dias);sems.splice(i,1);i--}}
@@ -533,7 +533,7 @@ function semanal(B,P,c,ehVend){
   const pr=v=>Math.round(v*100)+'%';
   let tk=c.ticket; if(c.cli<10&&VENDAS.meses[mesAnt(B.ym)]){const a=VENDAS.meses[mesAnt(B.ym)].vendas.filter(x=>x[3]===P.nome&&x[2]!=='A'),n=new Set(a.map(x=>x[0]+'|'+x[5])).size;if(n>=10)tk=a.reduce((s,x)=>s+x[4],0)/n}
   const donut=(q,cl)=>{const R=52,L=2*Math.PI*R,f=Math.min(q,1)*L;return `<svg width="132" height="132" viewBox="0 0 120 120" style="flex:none"><circle cx="60" cy="60" r="${R}" fill="none" stroke="#26262b" stroke-width="13"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="${cl}" stroke-width="13" stroke-linecap="round" stroke-dasharray="${f} ${L}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" fill="#f4f4f5" font-size="24" font-weight="800">${pr(q)}</text><text x="60" y="77" text-anchor="middle" fill="#9a9aa2" font-size="10">da semana</text></svg>`};
-  const tipos=['C','P','A'].filter(t=>P.meta[t]), ic={C:'📱 Celulares',P:'🎧 Produtos',A:'🔧 Assistência'};
+  const tipos=['C','P'].filter(t=>P.meta[t]), ic={C:'📱 Celulares',P:'🎧 Produtos',A:'🔧 Assistência'};
   const barT=t=>{const m=P.meta[t]/(c.dt||1)*S.ab.length,v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=S.st==='atual'?cor(q,Math.max(S.esp,0.0001)):cor(q,1);
     return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${ic[t]}</span><span><b style="color:${cl}">${r0(v)}</b> <span style="color:var(--mut)">de ${r0(m)}</span></span></div><div class="ws-trk" style="display:block"><i style="width:${Math.min(q,1)*100}%;background:${cl}"></i></div></div>`};
   const estrelas=sems.filter(s=>s.st!=='fut'&&s.meta&&s.vend>=s.meta).length;
@@ -544,6 +544,10 @@ function semanal(B,P,c,ehVend){
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px">${donut(S.q,cS)}<div style="flex:1;min-width:180px"><div class="sub">${S.st==='atual'?'Falta pra bater a semana':'Resultado da semana'}</div><div style="font-size:34px;font-weight:800;line-height:1.05;color:${cS}">${falta?r0(falta):'Batida ✅'}</div><div class="sub" style="margin-top:6px">Vendeu ${r0(S.vend)} de ${r0(S.meta)}</div><div style="margin-top:8px;font-size:13.5px">${msg}</div></div></div>
     ${S.st==='atual'?`<div class="ws-k"><div><small>Dias de venda</small><b>${resta} ${resta===1?'dia':'dias'}</b></div><div><small>Por dia</small><b>${resta&&falta?r0(falta/resta):'—'}</b></div><div><small>Clientes</small><b>${tk&&resta&&falta?'≈ '+Math.ceil(falta/resta/tk)+'/dia':'—'}</b></div></div>`:''}
     ${tipos.map(barT).join('')}</div>`;
+  if(P.meta.A||c.vend.A){const qa=P.meta.A?c.vend.A/P.meta.A:0;
+    h+=`<div class="status" style="padding:14px 16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="lbl">🔧 Assistência técnica</span><span style="font-size:11.5px;color:var(--mut)">separada da meta de vendas</span></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px"><div class="ws-trk"><i style="width:${Math.min(qa,1)*100}%;background:${cor(qa,c.ritmo)}"></i></div><b style="color:${cor(qa,c.ritmo)}">${pr(qa)}</b></div>
+    <div class="sub" style="margin-top:6px;font-size:13px">${r0(c.vend.A)} no mês${P.meta.A&&!ehVend?' de '+r0(P.meta.A):''}</div></div>`}
   // gráfico dos dias
   const dd=S.ab, W=520, Hh=180, bw=W/(dd.length||1), mx=Math.max(metaDia*1.5,...dd.map(vdia),1), y=v=>Hh-24-v/mx*(Hh-44);
   let g=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" style="display:block">`;
@@ -563,7 +567,7 @@ function semanal(B,P,c,ehVend){
 function vRender(){
   if(!VENDAS)return; const meses=Object.keys(VENDAS.meses).sort(); if(!vMes||!VENDAS.meses[vMes])vMes=meses[meses.length-1];
   const B=vBase(vMes), ehVend=vAcesso.perfil==='vendedor', [y,m]=vMes.split('-');
-  const ppl=Object.values(B.pessoas).filter(p=>!p.nome.startsWith('Loja ')&&(p.meta.P+p.meta.C+p.meta.A)>0);
+  const ppl=Object.values(B.pessoas).filter(p=>!p.nome.startsWith('Loja ')&&(p.meta.P+p.meta.C)>0);
   const calc={};ppl.forEach(p=>calc[p.nome]=vCalc(B,p,x=>x.v===p.nome));
   const rank=ppl.slice().sort((a,b)=>calc[b.nome].pct-calc[a.nome].pct);
   const dM=diasVenda('Matriz',vMes),dC=diasVenda('Catuaí',vMes),ref={dv:dM.filter(d=>d<B.H).length,dt:dM.length,cv:dC.filter(d=>d<B.H).length,ct:dC.length};
@@ -572,7 +576,10 @@ function vRender(){
   // lojas
   const lojaV=ehVend?(B.pessoas[vAcesso.vend]||{}).loja:null;
   $('vLojasBox').classList.toggle('hide',ehVend);
-  $('vLojas').innerHTML=['Matriz','Akash','Catuaí'].map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
+  const GL=['Matriz','Akash','Catuaí'].map(l=>vCalc(B,B.lojas[l],x=>x.l===l)), gM=GL.reduce((s,c)=>s+c.metaT,0), gV=GL.reduce((s,c)=>s+c.vendT,0), gP=GL.reduce((s,c)=>s+c.proj,0), gR=gM?GL.reduce((s,c)=>s+c.ritmo*c.metaT,0)/gM:0, gA=GL.reduce((s,c)=>s+(c.ant?c.ant.ate:0),0), gVA=GL.reduce((s,c)=>s+c.vendAte,0), gq=gM?gV/gM:0;
+  const grupo=`<div class="kpi" style="padding:16px;grid-column:1/-1;border:2px solid ${cor(gq,gR)}"><div style="display:flex;justify-content:space-between;align-items:center"><b style="margin:0;font-size:16px">🏢 Grupo IBLACK · 3 lojas</b><b style="margin:0;font-size:26px;color:${cor(gq,gR)}">${pct(gq*100)}</b></div>${barra(gq,gR)}
+     <i>${r0(gV)} de ${r0(gM)} · ideal hoje ${pct(gR*100)} · projeção ${r0(gP)} (${gM?pct(gP/gM*100):'—'} da meta)</i><br><i>faltam ${r0(Math.max(gM-gV,0))}${GL.some(c=>c.ant)?` · mês passado até o dia ${B.H-1}: ${r0(gA)} (${gA?((gVA/gA-1)>=0?'+':'')+pct((gVA/gA-1)*100):'—'})`:''}</i></div>`;
+  $('vLojas').innerHTML=ehVend?'':grupo+['Matriz','Akash','Catuaí'].map(l=>{const L=B.lojas[l],c=vCalc(B,L,x=>x.l===l);
     return `<div class="kpi" style="padding:14px"><div style="display:flex;justify-content:space-between"><b style="margin:0">${l}</b><b style="margin:0;color:${cor(c.pct,c.ritmo)}">${pct(c.pct*100)}</b></div>${barra(c.pct,c.ritmo)}
      <i>${r0(c.vendT)} de ${r0(c.metaT)} · projeção ${r0(c.proj)}</i><br><i>faltam ${r0(c.falta)} · <b style="display:inline;font-size:12px;color:var(--txt)">${r0(c.metaDia)}/dia</b> ${c.rest===1?'no último dia':'nos '+c.rest+' dias restantes (contando hoje)'}</i>
      <div style="margin-top:8px;font-size:12px;color:var(--mut)">${['P','C','A'].filter(t=>L.meta[t]||c.vend[t]).map(t=>`${TIPO[t]}: ${r0(c.vend[t])}${L.meta[t]?' / '+r0(L.meta[t])+' ('+pct(c.vend[t]/L.meta[t]*100)+')':''}`).join('<br>')}</div>
