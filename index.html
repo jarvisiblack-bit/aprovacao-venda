@@ -526,15 +526,16 @@ function semanal(B,P,c,ehVend){
     s.ai=s.ab[0]||s.ini;s.af=s.ab[s.ab.length-1]||s.fim;s.vend=s.dias.reduce((a,d)=>a+vdia(d),0);
     s.st=B.fechado||s.fim<H?'pass':s.ini>H?'fut':'atual';
     const feitos=s.ab.filter(d=>d<H).length;s.esp=s.st==='pass'?1:s.st==='fut'?0:(s.ab.length?feitos/s.ab.length:1);s.q=s.meta?s.vend/s.meta:0});
-  const S=sems.find(s=>s.st==='atual')||sems[sems.length-1], cS=S.st==='atual'?cor(S.q,Math.max(S.esp,0.0001)):cor(S.q,1);
+  const cw=(q,s)=>s.st==='atual'&&s.esp===0&&q<1?'#60a5fa':s.st==='atual'?cor(q,s.esp):cor(q,1);
+  const S=sems.find(s=>s.st==='atual')||sems[sems.length-1], cS=cw(S.q,S), novaSem=cS==='#60a5fa';
   const resta=S.st==='atual'?S.ab.filter(d=>d>=H).length:0, falta=Math.max(S.meta-S.vend,0), mm=MESES[Mo-1].slice(0,3);
-  const sel=S.q>=1?'SEMANA BATIDA':S.st!=='atual'?'ENCERRADA':S.q>=S.esp-0.005?'NO RITMO':S.q>=S.esp*0.85?'ATENÇÃO':'ABAIXO';
-  const msg=cS==='var(--ok)'?(S.q>=1?'Semana batida! Boa, campeão — você é top! Não para! 🏆':'Boa, campeão! Você é top — não para! 🏆'):cS==='var(--warn)'?'Tá quase lá! Mais um empurrão e a semana fica verde. 💪':'Bora acelerar um pouco — dá pra chegar lá! 🚀';
+  const sel=novaSem?'SEMANA NOVA':S.q>=1?'SEMANA BATIDA':S.st!=='atual'?'ENCERRADA':S.q>=S.esp-0.005?'NO RITMO':S.q>=S.esp*0.85?'ATENÇÃO':'ABAIXO';
+  const msg=novaSem?'Semana nova começando! Bora abrir o placar hoje — essa semana é sua. 🚀':cS==='var(--ok)'?(S.q>=1?'Semana batida! Boa, campeão — você é top! Não para! 🏆':'Boa, campeão! Você é top — não para! 🏆'):cS==='var(--warn)'?'Tá quase lá! Mais um empurrão e a semana fica verde. 💪':'Bora acelerar um pouco — dá pra chegar lá! 🚀';
   const pr=v=>Math.round(v*100)+'%';
   let tk=c.ticket; if(c.cli<10&&VENDAS.meses[mesAnt(B.ym)]){const a=VENDAS.meses[mesAnt(B.ym)].vendas.filter(x=>x[3]===P.nome&&x[2]!=='A'),n=new Set(a.map(x=>x[0]+'|'+x[5])).size;if(n>=10)tk=a.reduce((s,x)=>s+x[4],0)/n}
   const donut=(q,cl)=>{const R=52,L=2*Math.PI*R,f=Math.min(q,1)*L;return `<svg width="132" height="132" viewBox="0 0 120 120" style="flex:none"><circle cx="60" cy="60" r="${R}" fill="none" stroke="#26262b" stroke-width="13"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="${cl}" stroke-width="13" stroke-linecap="round" stroke-dasharray="${f} ${L}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" fill="#f4f4f5" font-size="24" font-weight="800">${pr(q)}</text><text x="60" y="77" text-anchor="middle" fill="#9a9aa2" font-size="10">da semana</text></svg>`};
   const tipos=['C','P'].filter(t=>P.meta[t]), ic={C:'📱 Celulares',P:'🎧 Produtos',A:'🔧 Assistência'};
-  const barT=t=>{const m=P.meta[t]/(c.dt||1)*S.ab.length,v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=S.st==='atual'?cor(q,Math.max(S.esp,0.0001)):cor(q,1);
+  const barT=t=>{const m=P.meta[t]/(c.dt||1)*S.ab.length,v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=cw(q,S);
     return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${ic[t]}</span><span><b style="color:${cl}">${r0(v)}</b> <span style="color:var(--mut)">de ${r0(m)}</span></span></div><div class="ws-trk" style="display:block"><i style="width:${Math.min(q,1)*100}%;background:${cl}"></i></div></div>`};
   const estrelas=sems.filter(s=>s.st!=='fut'&&s.meta&&s.vend>=s.meta).length;
   // topo: só o % do mês
@@ -559,7 +560,7 @@ function semanal(B,P,c,ehVend){
   g+=`<line x1="0" x2="${W}" y1="${y(metaDia)}" y2="${y(metaDia)}" stroke="#f4f4f5" stroke-opacity=".55" stroke-dasharray="5 4"/><text x="${W-4}" y="${y(metaDia)-5}" text-anchor="end" fill="#a1a1aa" font-size="10.5">meta/dia ${r0(metaDia)}</text></svg>`;
   h+=`<div class="status"><div class="lbl">Seus dias nesta semana</div><div class="sub" style="margin:4px 0 8px;font-size:13px">Barra = quanto vendeu · linha tracejada = meta do dia${B.fechado?'':' · azul = hoje (em andamento)'}</div>${g}</div>`;
   // cartões das semanas
-  h+=`<div class="status"><div class="lbl" style="margin-bottom:10px">Suas semanas no mês</div><div class="ws-sems">${sems.map(s=>{const cl=s.st==='fut'?'#3f3f46':s.st==='atual'?cor(s.q,Math.max(s.esp,0.0001)):cor(s.q,1);
+  h+=`<div class="status"><div class="lbl" style="margin-bottom:10px">Suas semanas no mês</div><div class="ws-sems">${sems.map(s=>{const cl=s.st==='fut'?'#3f3f46':cw(s.q,s);
     return `<div class="ws-sem" style="${s===S?'border-color:'+cl:''}"><small>Sem ${s.n}</small><b style="color:${s.st==='fut'?'#71717a':cl}">${s.st==='fut'?'—':pr(s.q)}</b><div class="ws-trk" style="display:block;height:6px"><i style="width:${s.st==='fut'?0:Math.min(s.q,1)*100}%;background:${cl}"></i></div><small>${s.ai}–${s.af}/${String(Mo).padStart(2,'0')}${s.st==='pass'&&s.q>=1?' ✅':s.st==='atual'?' · agora':''}</small></div>`}).join('')}</div>
     <div class="ws-leg"><span style="--c:var(--ok)">bateu / no ritmo</span><span style="--c:var(--warn)">perto</span><span style="--c:var(--bad)">abaixo</span><span style="--c:#3f3f46">ainda não começou</span></div></div>`;
   return h;
