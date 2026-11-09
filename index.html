@@ -522,11 +522,15 @@ function semanal(B,P,c,ehVend){
   const vdT=(d,t)=>B.V.filter(x=>x.v===P.nome&&x.d===d&&x.t===t).reduce((a,x)=>a+x.x,0);
   let sems=[],cur=null;for(let d=1;d<=B.nd;d++){if(!cur||dw(d)===1){cur={dias:[]};sems.push(cur)}cur.dias.push(d)}
   for(let i=0;i<sems.length;i++){if(sems[i].dias.filter(d=>dias.includes(d)).length<3&&sems.length>1){const alvo=sems[i+1]||sems[i-1];if(i+1<sems.length)alvo.dias.unshift(...sems[i].dias);else alvo.dias.push(...sems[i].dias);sems.splice(i,1);i--}}
-  sems.forEach((s,i)=>{s.n=i+1;s.ab=s.dias.filter(d=>dias.includes(d));s.base=metaDia*s.ab.length;s.ini=s.dias[0];s.fim=s.dias[s.dias.length-1];
-    s.ai=s.ab[0]||s.ini;s.af=s.ab[s.ab.length-1]||s.fim;s.vend=s.dias.reduce((a,d)=>a+vdia(d),0);
-    const pb=sems.slice(0,i).reduce((a,x)=>a+x.base,0), pv=sems.slice(0,i).reduce((a,x)=>a+x.vend,0); s.carry=Math.max(pb-pv,0); s.meta=s.base+s.carry;
+  // meta do mês dividida em partes iguais por semana; o que faltou (ou sobrou) das anteriores entra na semana seguinte, por tipo
+  const NS=sems.length, TT=['P','C'];
+  sems.forEach((s,i)=>{s.n=i+1;s.ab=s.dias.filter(d=>dias.includes(d));s.ini=s.dias[0];s.fim=s.dias[s.dias.length-1];
+    s.ai=s.ab[0]||s.ini;s.af=s.ab[s.ab.length-1]||s.fim;
+    s.vT={};TT.forEach(t=>s.vT[t]=s.dias.reduce((a,d)=>a+vdT(d,t),0));s.vend=s.vT.P+s.vT.C;
+    s.mT={};TT.forEach(t=>{const acum=(P.meta[t]||0)/NS*(i+1), vAnt=sems.slice(0,i).reduce((a,x)=>a+x.vT[t],0);s.mT[t]=Math.max(acum-vAnt,0)});
+    s.base=(P.meta.P+P.meta.C)/NS; s.meta=s.mT.P+s.mT.C; s.carry=s.meta-s.base;
     s.st=B.fechado||s.fim<H?'pass':s.ini>H?'fut':'atual';
-    const feitos=s.ab.filter(d=>d<H).length;s.esp=s.st==='pass'?1:s.st==='fut'?0:(s.ab.length?feitos/s.ab.length:1);s.q=s.meta?s.vend/s.meta:0});
+    const feitos=s.ab.filter(d=>d<H).length;s.esp=s.st==='pass'?1:s.st==='fut'?0:(s.ab.length?feitos/s.ab.length:1);s.q=s.meta?s.vend/s.meta:(s.st==='fut'?0:1)});
   const cw=(q,s)=>s.st==='atual'&&s.esp===0&&q<1?'#60a5fa':s.st==='atual'?cor(q,s.esp):cor(q,1);
   const S=sems.find(s=>s.st==='atual')||sems[sems.length-1], cS=cw(S.q,S), novaSem=cS==='#60a5fa';
   const resta=S.st==='atual'?S.ab.filter(d=>d>=H).length:0, falta=Math.max(S.meta-S.vend,0), mm=MESES[Mo-1].slice(0,3);
@@ -536,14 +540,14 @@ function semanal(B,P,c,ehVend){
   let tk=c.ticket; if(c.cli<10&&VENDAS.meses[mesAnt(B.ym)]){const a=VENDAS.meses[mesAnt(B.ym)].vendas.filter(x=>x[3]===P.nome&&x[2]!=='A'),n=new Set(a.map(x=>x[0]+'|'+x[5])).size;if(n>=10)tk=a.reduce((s,x)=>s+x[4],0)/n}
   const donut=(q,cl)=>{const R=52,L=2*Math.PI*R,f=Math.min(q,1)*L;return `<svg width="132" height="132" viewBox="0 0 120 120" style="flex:none"><circle cx="60" cy="60" r="${R}" fill="none" stroke="#26262b" stroke-width="13"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="${cl}" stroke-width="13" stroke-linecap="round" stroke-dasharray="${f} ${L}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" fill="#f4f4f5" font-size="24" font-weight="800">${pr(q)}</text><text x="60" y="77" text-anchor="middle" fill="#9a9aa2" font-size="10">da semana</text></svg>`};
   const tipos=['C','P'].filter(t=>P.meta[t]), ic={C:'📱 Celulares',P:'🎧 Produtos',A:'🔧 Assistência'};
-  const barT=t=>{const bt=P.meta[t]/(c.dt||1)*S.ab.length, m=S.base?bt*S.meta/S.base:bt,v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=cw(q,S);
+  const barT=t=>{const m=S.mT[t],v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=cw(q,S);
     return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${ic[t]}</span><span><b style="color:${cl}">${r0(v)}</b> <span style="color:var(--mut)">de ${r0(m)}</span></span></div><div class="ws-trk" style="display:block"><i style="width:${Math.min(q,1)*100}%;background:${cl}"></i></div></div>`};
   const estrelas=sems.filter(s=>s.st!=='fut'&&s.meta&&s.vend>=s.meta).length;
   // topo: só o % do mês
   let h=`<div class="status" style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px"><span class="lbl" style="white-space:nowrap">Meta do mês</span><div class="ws-trk"><i style="width:${Math.min(c.pct,1)*100}%;background:${cor(c.pct,c.ritmo)}"></i></div><b style="font-size:18px;color:${cor(c.pct,c.ritmo)}">${pr(c.pct)}</b>${estrelas?`<span title="semanas batidas">${'⭐'.repeat(estrelas)}</span>`:''}</div></div>`;
   // destaque: semana
   h+=`<div class="status" style="border:2px solid ${cS}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div class="lbl" style="color:${cS}">🎯 Meta da semana ${S.n} · ${S.ai} a ${S.af}/${mm}</div><span style="padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:color-mix(in srgb,${cS} 18%,transparent);color:${cS};white-space:nowrap">${sel}</span></div>
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px">${donut(S.q,cS)}<div style="flex:1;min-width:180px"><div class="sub">${S.st==='atual'?'Falta pra bater a semana':'Resultado da semana'}</div><div style="font-size:34px;font-weight:800;line-height:1.05;color:${cS}">${falta?r0(falta):'Batida ✅'}</div><div class="sub" style="margin-top:6px">Vendeu ${r0(S.vend)} de ${r0(S.meta)}${S.carry?`<br><span style="color:var(--warn)">inclui ${r0(S.carry)} que ficou da semana passada</span>`:''}</div><div style="margin-top:8px;font-size:13.5px">${msg}</div></div></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px">${donut(S.q,cS)}<div style="flex:1;min-width:180px"><div class="sub">${S.st==='atual'?'Falta pra bater a semana':'Resultado da semana'}</div><div style="font-size:34px;font-weight:800;line-height:1.05;color:${cS}">${falta?r0(falta):'Batida ✅'}</div><div class="sub" style="margin-top:6px">Vendeu ${r0(S.vend)} de ${r0(S.meta)}${S.n>1&&Math.abs(S.carry)>=1?(S.carry>0?`<br><span style="color:var(--warn)">inclui ${r0(S.carry)} que ficou das semanas anteriores</span>`:`<br><span style="color:var(--ok)">já desconta ${r0(-S.carry)} que você adiantou</span>`):''}</div><div style="margin-top:8px;font-size:13.5px">${msg}</div></div></div>
     ${S.st==='atual'?`<div class="ws-k"><div><small>Dias de venda</small><b>${resta} ${resta===1?'dia':'dias'}</b></div><div><small>Por dia</small><b>${resta&&falta?r0(falta/resta):'—'}</b></div><div><small>Clientes</small><b>${tk&&resta&&falta?'≈ '+Math.ceil(falta/resta/tk)+'/dia':'—'}</b></div></div>`:''}
     ${tipos.map(barT).join('')}</div>`;
   if(P.meta.A||c.vend.A){const qa=P.meta.A?c.vend.A/P.meta.A:0;
