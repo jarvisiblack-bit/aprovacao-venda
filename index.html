@@ -323,7 +323,7 @@ function calcular(custo,P,d){
   const c=CONFIG.comissao/100,f=taxa(pag),fU=CONFIG.taxaRevendaUsado/100,m=CONFIG.margemMinima/100;
   const um=USADOS[$('modeloU').value];
   const T=d.troca?d.usado:0,dias=d.troca?d.dias:0,cabo=d.troca?CONFIG.custoCaboUsado:0,bat=d.troca?custoBat(num('saude')):0;
-  const R=d.troca?(um&&um.rev?Math.min(d.revenda,um.rev):d.revenda):0;   // revenda nunca acima da tabela
+  const R=d.troca?d.revenda:0;   // usa a revenda digitada (aviso se passar da tabela)
   // NOVO: o usado entra como parte do pagamento; taxa só sobre o que passa no cartão
   const noCartao=Math.max(P-T,0);
   const lucroN=P-custo-c*P-f*noCartao, margN=P?lucroN/P*100:0;
@@ -403,7 +403,7 @@ function blocoUsado(r,pago){
       ? `<div class="fx ${acimaTab?'warn':'ok'}"><span>Oferta de ${brl(pago)}<small>${acima<-0.5?'sobra '+brl(-acima)+' até o limite de '+m+'%':'no limite de '+m+'%'}${acimaTab?' · acima do teto da tabela: confirmar com a diretoria':''}</small></span><b>${pct(r.margU)}</b></div>`
       : `<div class="fx bad"><span>Oferta ${brl(acima)} acima do limite<small>a loja perde ${brl(acima*(1+k))} de lucro · margem do usado ${pct(r.margU)}${r.lucroU<0?' (prejuízo)':''}</small></span><b>${pct(r.margU)}</b></div>`;
   }
-  if(um&&num('revenda')>um.rev+0.5) h+=`<div class="hint">A revenda digitada passa da tabela; o cálculo usa ${brl(um.rev)}.</div>`;
+  if(um&&num('revenda')>um.rev+0.5) h+=`<div class="hint" style="color:var(--warn)">A revenda digitada está ${brl(num('revenda')-um.rev)} acima da tabela (${brl(um.rev)}). O cálculo usa os ${brl(num('revenda'))} — confirme que o aparelho vende por esse valor.</div>`;
   return h;
 }
 function initUsados(){
