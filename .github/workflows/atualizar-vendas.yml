@@ -1,0 +1,33 @@
+name: Atualizar vendas
+on:
+  schedule:
+    - cron: '*/15 * * * *'      # a cada 15 minutos
+  workflow_dispatch: {}          # botão "Run workflow" para rodar na hora
+permissions:
+  contents: write
+  pages: write
+concurrency: { group: vendas, cancel-in-progress: false }
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -q openpyxl==3.1.5 cryptography==43.0.3
+      - id: robo
+        run: python atualizar_vendas.py
+        env:
+          PLANILHA_URL: ${{ secrets.PLANILHA_URL }}
+          USUARIOS_JSON: ${{ secrets.USUARIOS_JSON }}
+      - if: steps.robo.outputs.mudou == '1'
+        run: |
+          git config user.name "robo-iblack"
+          git config user.email "robo-iblack@users.noreply.github.com"
+          git add vendas.json
+          git commit -m "Vendas atualizadas (${{ steps.robo.outputs.mes }})"
+          git push
+      - if: steps.robo.outputs.mudou == '1'
+        continue-on-error: true
+        run: gh api -X POST repos/${{ github.repository }}/pages/builds
+        env: { GH_TOKEN: '${{ github.token }}' }
