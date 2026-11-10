@@ -1,7 +1,7 @@
 name: Atualizar vendas
 on:
   schedule:
-    - cron: '*/15 * * * *'      # a cada 15 minutos
+    - cron: '7,22,37,52 * * * *'   # a cada 15 minutos
   workflow_dispatch: {}          # botão "Run workflow" para rodar na hora
 permissions:
   contents: write
