@@ -14,6 +14,9 @@ TIPO={'Produtos':'P','Celulares':'C','Assistência Técnica':'A'}
 b64=lambda x:base64.b64encode(x).decode(); d64=base64.b64decode
 def kdf(salt,it,user,senha): return PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=it).derive((user+'\n'+senha).encode())
 def fix(s): s=str(s).strip(); return FIX.get(s,s)
+def num_ped(v):
+    if isinstance(v,float) and v.is_integer(): v=int(v)
+    s=str(v).strip(); return s[:-2] if s.endswith('.0') and s[:-2].isdigit() else s
 
 def baixar(url):
     if os.path.exists(url): return open(url,'rb').read()          # teste local
@@ -52,7 +55,7 @@ def ler_planilha(raw):
     for r in rows:
         if not(r[0] and r[7]) or str(r[1]).strip().lower()!=mes: continue
         if r[4] not in TIPO: print('AVISO tipo desconhecido, ignorado:',r); continue
-        vendas.append([f"{int(r[0]):02d}",str(r[3]).strip(),TIPO[r[4]],fix(r[5]),round(float(r[7]),2),str(r[6])])
+        vendas.append([f"{int(r[0]):02d}",str(r[3]).strip(),TIPO[r[4]],fix(r[5]),round(float(r[7]),2),num_ped(r[6])])
     desc={v[3] for v in vendas}-{m[0] for m in metas}
     if desc: print('AVISO vendedores sem meta:',desc)
     return ym,{'metas':metas,'vendas':vendas}
