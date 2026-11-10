@@ -17,17 +17,20 @@ def fix(s): s=str(s).strip(); return FIX.get(s,s)
 
 def baixar(url):
     if os.path.exists(url): return open(url,'rb').read()          # teste local
-    tent=[]
-    if 'sharepoint.com' in url: tent.append(url+('&' if '?' in url else '?')+'download=1')
-    else:
-        tent.append('https://api.onedrive.com/v1.0/shares/u!'+base64.urlsafe_b64encode(url.encode()).decode().rstrip('=')+'/root/content')
-        tent.append(url.replace('redir?','download?').replace('/edit','/download') if 'onedrive.live.com' in url else url+('&' if '?' in url else '?')+'download=1')
+    H={'User-Agent':'Mozilla/5.0'}
+    def get(u):
+        r=urllib.request.urlopen(urllib.request.Request(u,headers=H),timeout=60); return r.geturl(),r.read()
+    add=lambda u:u+('&' if '?' in u else '?')+'download=1'
+    tent=[add(url),'https://api.onedrive.com/v1.0/shares/u!'+base64.urlsafe_b64encode(url.encode()).decode().rstrip('=')+'/root/content']
+    try:                                    # segue o redirecionamento do 1drv.ms e tenta o endereço final
+        final,_=get(url); tent+=[add(final),final.replace('/redir?','/download?').replace('/view.aspx','/download.aspx')]
+    except Exception as e: print('não abriu o link original:',e)
     for u in tent:
         try:
-            r=urllib.request.urlopen(urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'}),timeout=60).read()
-            if r[:2]==b'PK': return r
-            print('link não devolveu Excel:',u[:80])
-        except Exception as e: print('falhou',u[:80],e)
+            _,r=get(u)
+            if r[:2]==b'PK': print('planilha baixada'); return r
+            print('link não devolveu Excel:',u[:90])
+        except Exception as e: print('falhou',u[:90],e)
     sys.exit('ERRO: não consegui baixar a planilha. Confira o link de compartilhamento (qualquer pessoa com o link pode ver).')
 
 def ler_planilha(raw):
