@@ -110,7 +110,7 @@ const CONFIG = {
   diasPadraoUsado: 30,
   diasAlertaParado: 60,                      // acima disso, alerta de aparelho parado na venda de seminovo
   lucroSobreCustoSeminovo: 20,               // seminovo: lucro mínimo de 20% SOBRE O CUSTO (entrada + parado + cabo + bateria)
-  lucroMinimoSeminovoReais: 800,             // seminovo: lucro mínimo em reais (vale o maior entre isso e os 20%)
+  lucroMinimoSeminovoReais: 500,             // seminovo: lucro mínimo em reais (vale o maior entre isso e os 20%)
   precMargemMin: 30,                         // precificação: margem mínima sobre o custo
   precComissao: 3,                           // precificação: comissão do vendedor sobre a venda
   custoBateria: 500,                         // troca de bateria quando a saúde está abaixo do limite
@@ -739,7 +739,15 @@ function sCalc(){
   if(r.ref&&r.min.avista>r.ref) h+=`<div class="hint">⚠️ Para manter o lucro mínimo o preço ficou ${brl(r.preco.avista-r.ref)} acima do mercado (${brl(r.ref)}). Esse aparelho foi comprado caro.</div>`;
   const P=num('sPreco');
   if(P){const f=taxa(sPag),l=P*(1-r.c-f)-r.custoTot,mk=l/r.custoTot*100,ok=P>=Math.ceil(r.min[sPag]),n=sPag==='avista'?'à vista':sPag.slice(1)+'x';
-    h+=fx(ok?'ok':'bad',`Proposta de ${brl(P)} ${n}`,ok?'Pode':'Não pode',ok?`lucro de ${brl(l)} (${pct(mk)} sobre o custo)`:`menor valor ${n}: ${brl(Math.ceil(r.min[sPag]))} · assim o lucro fica em ${pct(mk)}`)}
+    h+=fx(ok?'ok':'bad',`Proposta de ${brl(P)} ${n}`,ok?'Pode':(l<0?'Prejuízo':'Não pode'),ok?`lucro de ${brl(l)} (${pct(mk)} sobre o custo)`:(l<0?`<b style="color:var(--bad)">prejuízo de ${brl(-l)}</b>`:`lucro de só ${brl(l)} (${pct(mk)} sobre o custo)`)+` · menor valor ${n}: ${brl(Math.ceil(r.min[sPag]))}`)}
+  {const td='padding:8px 6px;text-align:right;white-space:nowrap',th='padding:6px;text-align:right;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)';
+   let tb=`<div class="status" style="margin-top:12px"><div class="lbl">Simulação por margem</div><div class="sub" style="margin:4px 0 8px">Lucro sobre o custo considerado (${brl(r.custoTot)}), já descontando comissão e taxa da maquininha. Sem o mínimo de ${brl(CONFIG.lucroMinimoSeminovoReais)} e sem o piso do preço de mercado.</div>
+     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px"><tr><th style="${th};text-align:left">Margem</th><th style="${th}">À vista</th><th style="${th}">12x</th><th style="${th}">18x</th><th style="${th}">Lucro à vista</th></tr>`;
+   for(const m of [15,20,30]){const pr={};for(const q of ['avista','x12','x18'])pr[q]=r9(r.custoTot*(1+m/100)/(1-r.c-taxa(q)));
+     const l=pr.avista*(1-r.c)-r.custoTot, abaixo=l<CONFIG.lucroMinimoSeminovoReais-0.5, cl=abaixo?'var(--warn)':'var(--ok)';
+     tb+=`<tr style="border-top:1px solid var(--line)"><td style="${td};text-align:left;font-weight:700;color:${cl}">${m}%</td><td style="${td};font-weight:700">${brl(pr.avista)}</td><td style="${td}">${brl(pr.x12)}<br><small style="color:var(--mut)">12x ${brl(pr.x12/12)}</small></td><td style="${td}">${brl(pr.x18)}<br><small style="color:var(--mut)">18x ${brl(pr.x18/18)}</small></td><td style="${td};color:${cl}">${brl(l)}${abaixo?'<br><small>⚠️ abaixo do mínimo</small>':''}</td></tr>`}
+   tb+=`</table></div><div class="hint" style="margin-top:6px">⚠️ Em amarelo: lucro abaixo do mínimo de ${brl(CONFIG.lucroMinimoSeminovoReais)} — use só com autorização.${r.ref?` Preço de mercado à vista: ${brl(r.ref)}.`:''}</div></div>`;
+   h+=tb}
   $('sFaixas').innerHTML=h;
   if(diretoria){
     const T=(a,b,k)=>`<tr><td>${a}</td><td class="${k||''}">${b}</td></tr>`;
@@ -749,6 +757,10 @@ function sCalc(){
     for(const p of ['avista','x12','x18']){const f=taxa(p),l=r.lucro(p);
       t+=`<tr class="sec"><td colspan="2">${nome[p]}</td></tr>`+T('Preço',brl(r.preco[p]))+T(`Comissão ${CONFIG.comissao}%`,brl(-r.preco[p]*r.c),'neg')+(f?T(`Taxa ${f*100}%`,brl(-r.preco[p]*f),'neg'):'')+
         `<tr class="tot"><td>Lucro · ${pct(l/r.custoTot*100)} sobre o custo</td><td class="${l<0?'neg':'pos'}">${brl(l)}</td></tr>`}
+    const Pp=num('sPreco');
+    if(Pp){const f=taxa(sPag),l=Pp*(1-r.c-f)-r.custoTot,n=sPag==='avista'?'à vista':sPag.slice(1)+'x';
+      t+=`<tr class="sec"><td colspan="2">Proposta do cliente · ${n}</td></tr>`+T('Valor oferecido',brl(Pp))+T(`Comissão ${CONFIG.comissao}%`,brl(-Pp*r.c),'neg')+(f?T(`Taxa ${f*100}%`,brl(-Pp*f),'neg'):'')+T('Custo total',brl(-r.custoTot),'neg')+
+        `<tr class="tot"><td>${l<0?'Prejuízo':'Lucro'} · ${pct(l/r.custoTot*100)} sobre o custo</td><td class="${l<0?'neg':'pos'}">${brl(l)}</td></tr>`}
     $('sDet').innerHTML=t;
   }
 }
