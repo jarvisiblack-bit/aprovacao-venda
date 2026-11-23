@@ -1,7 +1,7 @@
 """Robô IBLACK: lê a planilha de faturamento no OneDrive e atualiza vendas.json (criptografado).
 Roda no GitHub Actions. Segredos necessários: PLANILHA_URL (link de compartilhamento do Excel)
 e USUARIOS_JSON (lista de usuários e senhas). Só grava o arquivo se algo mudou."""
-import os,sys,io,json,gzip,base64,hashlib,collections,urllib.request,datetime
+import os,sys,io,re,json,gzip,base64,hashlib,collections,urllib.request,datetime
 import openpyxl
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -13,7 +13,10 @@ FIX={'Thayson lourenço':'Thayson Lourenço'}
 TIPO={'Produtos':'P','Celulares':'C','Assistência Técnica':'A'}
 b64=lambda x:base64.b64encode(x).decode(); d64=base64.b64decode
 def kdf(salt,it,user,senha): return PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=it).derive((user+'\n'+senha).encode())
-def fix(s): s=str(s).strip(); return FIX.get(s,s)
+def fix(s):
+    s=str(s).strip(); s=FIX.get(s,s)
+    if not s.startswith('Loja '): s=re.sub(r'\s*\([^)]*\)\s*$','',s)   # 'Pedro Henrique (catuai)' -> 'Pedro Henrique'
+    return s
 def num_ped(v):
     if isinstance(v,float) and v.is_integer(): v=int(v)
     s=str(v).strip(); return s[:-2] if s.endswith('.0') and s[:-2].isdigit() else s
