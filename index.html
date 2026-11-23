@@ -528,7 +528,9 @@ function semanal(B,P,c,ehVend){
     s.ai=s.ab[0]||s.ini;s.af=s.ab[s.ab.length-1]||s.fim;
     s.vT={};TT.forEach(t=>s.vT[t]=s.dias.reduce((a,d)=>a+vdT(d,t),0));s.vend=s.vT.P+s.vT.C;
     s.mT={};TT.forEach(t=>{const acum=(P.meta[t]||0)/NS*(i+1), vAnt=sems.slice(0,i).reduce((a,x)=>a+x.vT[t],0);s.mT[t]=Math.max(acum-vAnt,0)});
-    s.base=(P.meta.P+P.meta.C)/NS; s.meta=s.mT.P+s.mT.C; s.carry=s.meta-s.base;
+    s.base=(P.meta.P+P.meta.C)/NS; s.meta=s.mT.P+s.mT.C;
+    const restoMes=Math.max(P.meta.P+P.meta.C-sems.slice(0,i).reduce((a,x)=>a+x.vend,0),0); if(s.meta>restoMes){const f=s.meta?restoMes/s.meta:0;TT.forEach(t=>s.mT[t]*=f);s.meta=restoMes}  // a semana nunca pede mais do que falta no mês
+    s.carry=s.meta-s.base;
     s.st=B.fechado||s.fim<H?'pass':s.ini>H?'fut':'atual';
     const feitos=s.ab.filter(d=>d<H).length;s.esp=s.st==='pass'?1:s.st==='fut'?0:(s.ab.length?feitos/s.ab.length:1);s.q=s.meta?s.vend/s.meta:(s.st==='fut'?0:1)});
   const cw=(q,s)=>s.st==='atual'&&s.esp===0&&q<1?'#60a5fa':s.st==='atual'?cor(q,s.esp):cor(q,1);
@@ -543,6 +545,21 @@ function semanal(B,P,c,ehVend){
   const barT=t=>{const m=S.mT[t],v=S.dias.reduce((a,d)=>a+vdT(d,t),0),q=m?v/m:0,cl=cw(q,S);
     return `<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${ic[t]}</span><span><b style="color:${cl}">${r0(v)}</b> <span style="color:var(--mut)">de ${r0(m)}</span></span></div><div class="ws-trk" style="display:block"><i style="width:${Math.min(q,1)*100}%;background:${cl}"></i></div></div>`};
   const estrelas=sems.filter(s=>s.st!=='fut'&&s.meta&&s.vend>=s.meta).length;
+  if(ehVend){  // visão simples para o vendedor: 4 quadrantes coloridos
+    const faltaMes=Math.max(c.metaT-c.vendT,0), qMes=c.metaT?c.vendT/c.metaT:0, corSem=cS==='#60a5fa'?'#2563eb':cS==='var(--ok)'?'#16a34a':cS==='var(--warn)'?'#d97706':'#dc2626';
+    const Q=(bg,ic,tit,val,sub,extra)=>`<div style="background:${bg};border-radius:22px;padding:18px 16px;color:#fff;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 18px rgba(0,0,0,.25)">
+      <div style="font-size:34px;line-height:1">${ic}</div><div><div style="font-size:14px;font-weight:700;opacity:.92;margin-top:6px">${tit}</div>
+      <div style="font-size:clamp(20px,5.8vw,28px);font-weight:900;line-height:1.1;margin-top:4px;white-space:nowrap">${val}</div>${sub?`<div style="font-size:13px;opacity:.9;margin-top:4px">${sub}</div>`:''}${extra||''}</div></div>`;
+    const barra=(q)=>`<div style="height:10px;background:rgba(255,255,255,.3);border-radius:99px;margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(q,1)*100}%;background:#fff;border-radius:99px"></i></div>`;
+    let k=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">`;
+    k+=Q('linear-gradient(135deg,#2563eb,#1d4ed8)','💰','Já vendi no mês',r0(c.vendT),`📱 ${r0(c.vend.C)} · 🎧 ${r0(c.vend.P)}`);
+    k+=Q('linear-gradient(135deg,#7c3aed,#6d28d9)','🎯',`Minha meta da semana`,r0(S.meta),`${S.ai} a ${S.af}/${mm} · já fiz ${r0(S.vend)}`,barra(S.q));
+    k+=Q(`linear-gradient(135deg,${corSem},${corSem}cc)`,falta?'⏳':'✅',falta?'Falta pra semana':'Semana batida!',falta?r0(falta):'BATI! 🎉',falta&&resta?`${r0(falta/resta)} por dia`:'');
+    k+=Q('linear-gradient(135deg,#ea580c,#c2410c)',faltaMes?'🏁':'🏆',faltaMes?'Falta pro mês':'Mês batido!',faltaMes?r0(faltaMes):'BATI! 🏆',`já fiz ${pr(qMes)} do mês`,barra(qMes));
+    k+=`</div>`;
+    k+=`<div style="margin-top:12px;border-radius:22px;padding:18px;background:${corSem};color:#fff;font-size:18px;font-weight:800;text-align:center;line-height:1.35">${msg}</div>`;
+    return k;
+  }
   // topo: só o % do mês
   let h=`<div class="status" style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px"><span class="lbl" style="white-space:nowrap">Meta do mês</span><div class="ws-trk"><i style="width:${Math.min(c.pct,1)*100}%;background:${cor(c.pct,c.ritmo)}"></i></div><b style="font-size:18px;color:${cor(c.pct,c.ritmo)}">${pr(c.pct)}</b>${estrelas?`<span title="semanas batidas">${'⭐'.repeat(estrelas)}</span>`:''}</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;align-items:baseline"><div><div class="sub" style="font-size:12px">Você já vendeu no mês</div><div style="font-size:24px;font-weight:800">${r0(c.vendT)}</div></div>${['C','P'].filter(t=>P.meta[t]||c.vend[t]).map(t=>`<div><div class="sub" style="font-size:12px">${t==='C'?'📱 Celulares':'🎧 Produtos'}</div><div style="font-size:16px;font-weight:700">${r0(c.vend[t])}</div></div>`).join('')}${c.vend.A?`<div><div class="sub" style="font-size:12px">🔧 Assistência</div><div style="font-size:16px;font-weight:700">${r0(c.vend.A)}</div></div>`:''}</div></div>`;
@@ -626,11 +643,11 @@ function vRender(){
     K('Projeção do mês',r0(c.proj),c.metaT?pct(c.proj/c.metaT*100)+' da meta':'',cor(c.proj/(c.metaT||1),1))+
     K('Falta para a meta',r0(c.falta),c.falta?`${c.rest} ${c.rest===1?'dia':'dias'} de venda ${c.rest===1?'restante':'restantes'}`:'meta batida! 🎉')+
     K('Ticket médio por cliente',r0(c.ticket),`${c.cli} clientes no mês`);}
-  else h+=`<div class="kpis">`;
+  else h+='';
   const comp=c.ant?`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b>${r0(c.hoje)} <span style="font-size:13px;color:var(--mut);font-weight:500">hoje × ${B.H>c.ant.nd?`(o mês passado não teve dia ${B.H})`:`${r0(c.ant.dia)} no dia ${B.H} do mês passado`}</span></b><i>Acumulado até ontem (dia ${B.H-1}): ${r0(c.vendAte)} × ${r0(c.ant.ate)} no mês passado (${c.ant.ate?`<b style="display:inline;font-size:12px;color:${c.vendAte>=c.ant.ate?'var(--ok)':'var(--bad)'}">${c.vendAte>=c.ant.ate?'+':''}${pct((c.vendAte/c.ant.ate-1)*100)}</b>`:'—'})</i></div>`
     :`<div class="kpi" style="grid-column:1/-1"><small>Mesmo dia do mês anterior · dia ${B.H}</small><b style="font-size:15px;color:var(--warn)">Sem histórico do mês anterior</b><i>A comparação aparece quando o mês passado estiver carregado.</i></div>`;
-  h+=comp;
-  h+=`</div>`;
+  if(!ehVend){h+=comp;
+  h+=`</div>`;}
   if(!ehVend)h+=`<div style="margin-top:14px">${['P','C','A'].filter(t=>P.meta[t]||c.vend[t]).map(t=>{const mt=P.meta[t],pc=mt?c.vend[t]/mt:0;return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${TIPO[t]}</span><span>${r0(c.vend[t])}${mt?' / '+r0(mt)+' · <b>'+pct(pc*100)+'</b>':''}</span></div>${mt?barra(pc,c.ritmo):''}</div>`}).join('')}</div>`;
   if(P.meta.P){const v=c.vend.P, nx=NIV.find(([n,f])=>v<P.meta.P*f), at=NIV.filter(([n,f])=>v>=P.meta.P*f).pop();
     const frases={Meta:'Bora bater a meta! Cada venda conta. 💪',Super:'A Meta já é sua — agora é Super! 🚀',Mega:'Você está voando! Mega está logo ali. 🔥',Ultra:'Nível de elite! Falta pouco para o Ultra. ⚡',Extrato:'Poucos chegam aqui. Vá buscar o Extrato! 🏆'};
@@ -639,7 +656,7 @@ function vRender(){
         <div class="barra"><span style="width:${Math.min(pr,1)*100}%;background:#facc15"></span></div>
         <div class="sub">${frases[nx[0]]} ${na?`São cerca de <b>${na} ${na===1?'produto/acessório':'produtos/acessórios'}</b> no seu ticket médio de ${r0(c.tP)}.`:''} ${at?`Você já conquistou: <b>${at[0]}</b>.`:''}${c.rest?` Dá ${r0(fx/c.rest)} por dia nos ${c.rest} ${c.rest===1?'dia':'dias'} que restam.`:''}</div></div>`}
     else h+=`<div class="status s-ok" style="margin:6px 0 10px"><div class="lbl">Todos os níveis conquistados</div><div class="big">🏆 Extrato atingido!</div><div class="sub">Você chegou ao topo em Produtos. Lenda!</div></div>`;
-    h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n}${ehVend?'':' '+r0(P.meta.P*f)}</span>`).join('')}</div>`}
+    if(!ehVend)h+=`<div class="hint" style="margin-bottom:6px">Níveis em Produtos</div><div class="nivs">${NIV.map(([n,f])=>`<span class="${v>=P.meta.P*f?'ok':''}">${v>=P.meta.P*f?'✓ ':''}${n}${ehVend?'':' '+r0(P.meta.P*f)}</span>`).join('')}</div>`}
   const podeBonus=['diretoria','gerente'].includes(vAcesso.perfil)||vAcesso.bonus==='todos'||vAcesso.vend===P.nome;
   if(podeBonus){const pj=t=>B.fechado?c.vend[t]:(c.dv?c.ateT[t]/c.dv*c.dt:0), pa=BONUS.participacao[P.nome], lps=pa?pa[0].filter(l=>B.lojas[l]).map(l=>vCalc(B,B.lojas[l],x=>x.l===l)):[], lp=lps.length?{vend:{P:lps.reduce((s,q)=>s+q.vend.P,0)}}:null;
     const lojaPj=lps.reduce((s,q)=>s+(B.fechado?q.vend.P:(q.dv?q.ateT.P/q.dv*q.dt:0)),0);
@@ -660,6 +677,7 @@ function vRender(){
       <div id="cbRes"></div></div>`}
   if(!ehVend)h+=grafico(c,c.metaT,c.dt,c.dias);
   $('vDet').innerHTML=h;
+  if(ehVend){const ds=$('vDet').closest('section'), ps=$('vPodio').closest('section'); if(ds.previousElementSibling!==$('vLojasBox')) ds.parentNode.insertBefore(ds,ps); $('vNomeT').textContent='Olá, '+P.nome.split(' ')[0]+' 👋';}
   if($('cbAlvo')){$('cbAlvo').oninput=cbCalc;$('cbMix').oninput=cbCalc;$('vDet').querySelectorAll('[data-cb]').forEach(b=>b.onclick=()=>{$('cbAlvo').value=b.dataset.cb;cbCalc()});cbCalc()}
 }
 /* ---------- aba: precificação (só diretoria) ---------- */
