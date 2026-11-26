@@ -17,6 +17,14 @@ def fix(s):
     s=str(s).strip(); s=FIX.get(s,s)
     if not s.startswith('Loja '): s=re.sub(r'\s*\([^)]*\)\s*$','',s)   # 'Pedro Henrique (catuai)' -> 'Pedro Henrique'
     return s
+def valor(v):
+    if isinstance(v,(int,float)): return float(v)
+    t=str(v or '').replace('R$','').replace('\xa0','').replace(' ','').strip()
+    if not t: return None
+    if ',' in t: t=t.replace('.','').replace(',','.')          # 1.234,56 -> 1234.56
+    elif re.fullmatch(r'\d{1,3}(\.\d{3})+',t): t=t.replace('.','')   # 1.234 -> 1234
+    try: return float(t)
+    except ValueError: return None
 def num_ped(v):
     if isinstance(v,float) and v.is_integer(): v=int(v)
     s=str(v).strip(); return s[:-2] if s.endswith('.0') and s[:-2].isdigit() else s
@@ -58,7 +66,11 @@ def ler_planilha(raw):
     for r in rows:
         if not(r[0] and r[7]) or str(r[1]).strip().lower()!=mes: continue
         if r[4] not in TIPO: print('AVISO tipo desconhecido, ignorado:',r); continue
-        vendas.append([f"{int(r[0]):02d}",str(r[3]).strip(),TIPO[r[4]],fix(r[5]),round(float(r[7]),2),num_ped(r[6])])
+        vl=valor(r[7])
+        try: dia=int(float(str(r[0]).strip()))
+        except ValueError: dia=None
+        if vl is None or dia is None: print('AVISO linha ignorada (valor ou dia ilegível):',r); continue
+        vendas.append([f"{dia:02d}",str(r[3]).strip(),TIPO[r[4]],fix(r[5]),round(vl,2),num_ped(r[6])])
     desc={v[3] for v in vendas}-{m[0] for m in metas}
     if desc: print('AVISO vendedores sem meta:',desc)
     return ym,{'metas':metas,'vendas':vendas}
